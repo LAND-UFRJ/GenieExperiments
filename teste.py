@@ -12,7 +12,7 @@ acs = genieacs.Connection("10.246.3.119", auth=True, user="admin", passwd="admin
 # set a device_id for the following methods
 
 devices = acs.device_get_all_IDs()
-device_id = "98254A-Device2-223C1S5004290"
+device_id = "5091E3-EX141-2237011003026"
 obj = "Device"
 
 #brincando...
@@ -36,10 +36,71 @@ def download_file_json():
             json.dump(device_data, json_file, indent=4)
         print(f"Device data written to {json_file_path}")
 
+def get_wifi_stats():
+    for device in devices:
+        parameters = []
+        for i in range(1, 21):  # Assuming there are up to 10 associated devices, adjust the range as needed
+            for j in range(1, 3):
+                for k in range(1, 3): 
+                    parameters.extend([
+                        f"Device.WiFi.MultiAP.APDevice.1.Radio.{k}.AP.{j}.AssociatedDevice.{i}.Active",
+                        f"Device.WiFi.MultiAP.APDevice.1.Radio.{k}.AP.{j}.AssociatedDevice.{i}.X_TP_HostName",
+                        f"Device.WiFi.MultiAP.APDevice.1.Radio.{k}.AP.{j}.AssociatedDevice.{i}.MacAddress",
+                        f"Device.WiFi.MultiAP.APDevice.1.Radio.{k}.AP.{j}.AssociatedDevice.{i}.Stats.BytesReceived",
+                        f"Device.WiFi.MultiAP.APDevice.1.Radio.{k}.AP.{j}.AssociatedDevice.{i}.Stats.BytesSent",
+                        f"Device.WiFi.MultiAP.APDevice.1.Radio.{k}.AP.{j}.AssociatedDevice.{i}.Stats.PacketsReceived",
+                        f"Device.WiFi.MultiAP.APDevice.1.Radio.{k}.AP.{j}.AssociatedDevice.{i}.Stats.PacketsSent",
+                        f"Device.WiFi.MultiAP.APDevice.1.Radio.{k}.AP.{j}.AssociatedDevice.{i}.Stats.ErrorsReceived",
+                        f"Device.WiFi.MultiAP.APDevice.1.Radio.{k}.AP.{j}.AssociatedDevice.{i}.Stats.ErrorsSent",
+                        f"Device.WiFi.MultiAP.APDevice.1.Radio.{k}.AP.{j}.AssociatedDevice.{i}.Stats.RetransCount"
+                    ])
+        output = []
+        for param in parameters:
+            value = acs.device_get_parameter(device, param)
+            if value is not None:
+                output.append((param, value))
+        if output:
+            print(f"Device: {device}")
+            for param, value in output:
+                print(f"  Parameter: {param}, Value: {value}")
+    print("done wifi stats")
+
+    def download_wifi_stats_to_csv():
+        with open('/home/localuser/Documentos/VSCode/genieacs/wifi_stats.csv', 'w', newline='') as csvfile:
+            csvwriter = csv.writer(csvfile)
+            csvwriter.writerow(['Device', 'Parameter', 'Value'])  # Write the header row
+            for device in devices:
+                parameters = []
+                for i in range(1, 11):  # Assuming there are up to 10 associated devices, adjust the range as needed
+                    for j in range(1, 3):
+                        for k in range(1, 3): 
+                            parameters.extend([
+                                f"Device.WiFi.MultiAP.APDevice.1.Radio.{k}.AP.{j}.AssociatedDevice.{i}.Active",
+                                f"Device.WiFi.MultiAP.APDevice.1.Radio.{k}.AP.{j}.AssociatedDevice.{i}.X_TP_HostName",
+                                f"Device.WiFi.MultiAP.APDevice.1.Radio.{k}.AP.{j}.AssociatedDevice.{i}.MacAddress",
+                                f"Device.WiFi.MultiAP.APDevice.1.Radio.{k}.AP.{j}.AssociatedDevice.{i}.Stats.BytesReceived",
+                                f"Device.WiFi.MultiAP.APDevice.1.Radio.{k}.AP.{j}.AssociatedDevice.{i}.Stats.BytesSent",
+                                f"Device.WiFi.MultiAP.APDevice.1.Radio.{k}.AP.{j}.AssociatedDevice.{i}.Stats.PacketsReceived",
+                                f"Device.WiFi.MultiAP.APDevice.1.Radio.{k}.AP.{j}.AssociatedDevice.{i}.Stats.PacketsSent",
+                                f"Device.WiFi.MultiAP.APDevice.1.Radio.{k}.AP.{j}.AssociatedDevice.{i}.Stats.ErrorsReceived",
+                                f"Device.WiFi.MultiAP.APDevice.1.Radio.{k}.AP.{j}.AssociatedDevice.{i}.Stats.ErrorsSent",
+                                f"Device.WiFi.MultiAP.APDevice.1.Radio.{k}.AP.{j}.AssociatedDevice.{i}.Stats.RetransCount"
+                            ])
+                output = []
+                for param in parameters:
+                    value = acs.device_get_parameter(device, param)
+                    if value is not None:
+                        output.append((param, value))
+                if output:
+                    for param, value in output:
+                        csvwriter.writerow([device, param, value])
+        print("done wifi stats to csv")
+
+    download_wifi_stats_to_csv()
 #change_SSID("vasco", "flamengo")
 #change_Password("12345678")
-download_file_json()
-
+#download_file_json()
+get_wifi_stats()
 print("done final")
 
 
