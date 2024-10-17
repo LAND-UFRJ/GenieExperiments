@@ -2,7 +2,7 @@ import openai
 import genieacs
 import json
 
-client = openai.OpenAI(api_key="landufrj123", base_url="http://10.246.3.122:8080/v1")
+client = openai.OpenAI(api_key="secret", base_url="secret")
 
 #
 
