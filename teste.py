@@ -1,22 +1,33 @@
-#!/usr/bin/python
-# -*- coding: utf-8 -*-
-# Usage examples for python-genieacs
-
 import genieacs
-import csv
+import psycopg2
 import json
 
-# Create a Connection object to interact with a GenieACS server
+# Conectar ao GenieACS
 acs = genieacs.Connection("10.246.3.119", auth=True, user="admin", passwd="admin", port="7557")
 
-# set a device_id for the following methods
+# Conectar ao TimescaleDB
+conn = psycopg2.connect(
+    host="10.246.3.111",
+    database="postgres",
+    user="postgres",
+    password="landufrj123"
+)
+
+# Criar tabela TimescaleDB (se ainda não existir)
+cur = conn.cursor()
+cur.execute("""
+    CREATE TABLE IF NOT EXISTS device_data (
+        id SERIAL PRIMARY KEY,
+        device_id TEXT,
+        data JSONB,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+    );
+""")
+conn.commit()
 
 devices = acs.device_get_all_IDs()
 device_id = "98254A-Device2-223C1S5004290"
 obj = "Device"
-
-#brincando...
-#Mudando a Rede e Senha do Wifi
 
 def change_SSID(rede1, rede2):
     acs.task_set_parameter_values(device_id, ["Device.WiFi.SSID.1.SSID", rede1])
@@ -28,19 +39,25 @@ def change_Password(senha):
     acs.task_set_parameter_values(device_id, [["Device.WiFi.AccessPoint.3.Security.KeyPassphrase", senha]])
     print("done password")
 
-def download_file_json():
+def download_file_to_timescale():
     for device in devices:
         device_data = acs.device_get_by_id(device)
-        json_file_path = f'/home/localuser/Documentos/VSCode/genieacs/device_data_{device}.json'
-        with open(json_file_path, 'w') as json_file:
-            json.dump(device_data, json_file, indent=4)
-        print(f"Device data written to {json_file_path}")
+        
+        # Inserir dados no TimescaleDB
+        cur.execute("""
+            INSERT INTO device_data (device_id, data) VALUES (%s, %s)
+        """, (device, json.dumps(device_data)))
+        conn.commit()
+        
+        print(f"Device data inserted into TimescaleDB for {device}")
 
-#change_SSID("vasco", "flamengo")
-#change_Password("12345678")
-download_file_json()
-
+download_file_to_timescale()
 print("done final")
+
+# Fechar a conexão com TimescaleDB
+cur.close()
+conn.close()
+
 
 
 
