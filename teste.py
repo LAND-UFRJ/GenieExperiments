@@ -3,17 +3,20 @@ import psycopg2
 import json
 
 # Conectar ao GenieACS
+print("Conectando ao GenieACS...")
 acs = genieacs.Connection("10.246.3.119", auth=True, user="admin", passwd="admin", port="7557")
 
 # Conectar ao TimescaleDB
+print("Conectando ao TimescaleDB...")
 conn = psycopg2.connect(
     host="10.246.3.111",
-    database="postgres",
+    database="testemiguel",
     user="postgres",
     password="landufrj123"
 )
 
 # Criar tabela TimescaleDB (se ainda não existir)
+print("Criando tabela TimescaleDB...")
 cur = conn.cursor()
 cur.execute("""
     CREATE TABLE IF NOT EXISTS device_data (
@@ -25,9 +28,10 @@ cur.execute("""
 """)
 conn.commit()
 
+print("Tabela criada com sucesso ou já existia.")
+
 devices = acs.device_get_all_IDs()
-device_id = "98254A-Device2-223C1S5004290"
-obj = "Device"
+print(f"Dispositivos encontrados: {len(devices)}")
 
 def change_SSID(rede1, rede2):
     acs.task_set_parameter_values(device_id, ["Device.WiFi.SSID.1.SSID", rede1])
@@ -41,15 +45,24 @@ def change_Password(senha):
 
 def download_file_to_timescale():
     for device in devices:
+        print(f"Coletando dados para dispositivo {device}...")
         device_data = acs.device_get_by_id(device)
         
-        # Inserir dados no TimescaleDB
-        cur.execute("""
-            INSERT INTO device_data (device_id, data) VALUES (%s, %s)
-        """, (device, json.dumps(device_data)))
-        conn.commit()
+        if not device_data:
+            print(f"Nenhum dado coletado para o dispositivo {device}")
+            continue
         
-        print(f"Device data inserted into TimescaleDB for {device}")
+        print(f"Dados coletados para {device}")
+
+        try:
+            # Inserir dados no TimescaleDB
+            cur.execute("""
+                INSERT INTO device_data (device_id, data) VALUES (%s, %s)
+            """, (device, json.dumps(device_data)))
+            conn.commit()
+            print(f"Device data inserted for {device}")
+        except Exception as e:
+            print(f"Erro ao inserir dados para o dispositivo {device}: {e}")
 
 download_file_to_timescale()
 print("done final")
@@ -57,6 +70,8 @@ print("done final")
 # Fechar a conexão com TimescaleDB
 cur.close()
 conn.close()
+
+
 
 
 
