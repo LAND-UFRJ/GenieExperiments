@@ -17,8 +17,6 @@ acs = genieacs.Connection("*", auth=True, user="*", passwd="*", port="7557")
 # set a device_id for the following methods
 
 devices = acs.device_get_all_IDs()
-device_id = "*"
-obj = "Device"
 
 #brincando...
 #Mudando a Rede e Senha do Wifi
