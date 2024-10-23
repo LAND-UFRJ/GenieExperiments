@@ -12,12 +12,12 @@ import os
 import glob
 
 # Create a Connection object to interact with a GenieACS server
-acs = genieacs.Connection("10.246.3.119", auth=True, user="admin", passwd="admin", port="7557")
+acs = genieacs.Connection("*", auth=True, user="*", passwd="*", port="7557")
 
 # set a device_id for the following methods
 
 devices = acs.device_get_all_IDs()
-device_id = "5091E3-EX141-2237011003026"
+device_id = "*"
 obj = "Device"
 
 #brincando...
