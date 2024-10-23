@@ -15,9 +15,3 @@ Antes de começar, certifique-se de ter os seguintes componentes instalados:
 - PostgreSQL com extensão TimescaleDB
 - Bibliotecas Python: `psycopg2`, `json`
 
-## Instalação
-
-1. Clone este repositório:
-   ```bash
-   git clone https://github.com/sua-organizacao/seu-repositorio.git
-   cd seu-repositorio
