@@ -10,18 +10,34 @@ acs = genieacs.Connection("10.246.3.119", auth=True, user="admin", passwd="admin
 print("Conectando ao TimescaleDB...")
 conn = psycopg2.connect(
     host="10.246.3.111",
-    database="testemiguel",
+    database="otherparameters",
     user="postgres",
     password="landufrj123"
 )
 
+# Remover duplicados antes de adicionar restrição
+print("Removendo duplicados...")
+cur = conn.cursor()
+cur.execute("""
+    DELETE FROM device_data a
+    USING device_data b
+    WHERE a.ctid < b.ctid AND a.device_id = b.device_id;
+""")
+conn.commit()
+
+# Adicionar restrição de unicidade
+print("Adicionando restrição de unicidade...")
+cur.execute("""
+    CREATE UNIQUE INDEX IF NOT EXISTS device_id_unique ON device_data(device_id);
+""")
+conn.commit()
+
 # Criar tabela TimescaleDB (se ainda não existir)
 print("Criando tabela TimescaleDB...")
-cur = conn.cursor()
 cur.execute("""
     CREATE TABLE IF NOT EXISTS device_data (
         id SERIAL PRIMARY KEY,
-        device_id TEXT,
+        device_id TEXT UNIQUE,
         data JSONB,
         created_at TIMESTAMPTZ DEFAULT NOW()
     );
@@ -46,18 +62,21 @@ def change_Password(senha):
 def download_file_to_timescale():
     for device in devices:
         print(f"Coletando dados para dispositivo {device}...")
-        device_data = acs.device_get_by_id(device)
+        device_data = acs.device_get_parameter(device, "Device.WiFi.SSID.1.SSID")
         
         if not device_data:
             print(f"Nenhum dado coletado para o dispositivo {device}")
             continue
         
-        print(f"Dados coletados para {device}")
+        print(f"Dados coletados para {device}: {device_data}")
 
         try:
-            # Inserir dados no TimescaleDB
+            # Inserir dados no TimescaleDB com conflito resolvido
             cur.execute("""
-                INSERT INTO device_data (device_id, data) VALUES (%s, %s)
+                INSERT INTO device_data (device_id, data)
+                VALUES (%s, %s)
+                ON CONFLICT (device_id)
+                DO UPDATE SET data = EXCLUDED.data, created_at = NOW();
             """, (device, json.dumps(device_data)))
             conn.commit()
             print(f"Device data inserted for {device}")
@@ -70,6 +89,8 @@ print("done final")
 # Fechar a conexão com TimescaleDB
 cur.close()
 conn.close()
+
+
 
 
 
