@@ -5,15 +5,15 @@ import time
 
 # Conectar ao GenieACS
 print("Conectando ao GenieACS...")
-acs = genieacs.Connection("10.246.3.119", auth=True, user="admin", passwd="admin", port="7557")
+acs = genieacs.Connection("", auth=True, user="", passwd="", port="")
 
 # Conectar ao TimescaleDB
 print("Conectando ao TimescaleDB...")
 conn = psycopg2.connect(
-    host="10.246.3.111",
-    database="otherparameters",
-    user="postgres",
-    password="landufrj123"
+    host="",
+    database="",
+    user="",
+    password=""
 )
 
 cur = conn.cursor()
@@ -33,7 +33,7 @@ conn.commit()
 print("Tabela criada com sucesso ou já existia.")
 
 # Definir o ID do dispositivo específico
-specific_device_id = "5091E3-EX141-2237011003026"  # Substitua pelo ID real do dispositivo desejado
+specific_device_id = ""  # Substitua pelo ID real do dispositivo desejado
 interval = 1  # Intervalo em segundos (30 segundos)
 
 def refresh_parameter_in_genieacs():
