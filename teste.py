@@ -13,6 +13,9 @@ import os
 # Create a Connection object to interact with a GenieACS server
 acs = genieacs.Connection()
 
+# Conexão ao TimescaleDB
+conn = psycopg2.connect()
+
 # set a device_id for the following methods
 
 devices = acs.device_get_all_IDs()
@@ -160,14 +163,6 @@ def create_table():
     conn.close()
 
 def insert_csv_to_timescaledb(csv_file_name):
-    # Conexão ao TimescaleDB
-    conn = psycopg2.connect(
-        dbname="testegenie",
-        user="postgres",
-        password="landufrj123",
-        host="10.246.3.111",
-        port="5432"
-    )
     cursor = conn.cursor()
     
     # Abrir o arquivo CSV e inserir os dados
