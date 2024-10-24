@@ -1,6 +1,7 @@
 import genieacs
 import psycopg2
 import json
+import time
 
 # Conectar ao GenieACS
 print("Conectando ao GenieACS...")
@@ -15,29 +16,14 @@ conn = psycopg2.connect(
     password="landufrj123"
 )
 
-# Remover duplicados antes de adicionar restrição
-print("Removendo duplicados...")
 cur = conn.cursor()
-cur.execute("""
-    DELETE FROM device_data a
-    USING device_data b
-    WHERE a.ctid < b.ctid AND a.device_id = b.device_id;
-""")
-conn.commit()
 
-# Adicionar restrição de unicidade
-print("Adicionando restrição de unicidade...")
-cur.execute("""
-    CREATE UNIQUE INDEX IF NOT EXISTS device_id_unique ON device_data(device_id);
-""")
-conn.commit()
-
-# Criar tabela TimescaleDB (se ainda não existir)
+# Criar tabela TimescaleDB (sem restrições de unicidade)
 print("Criando tabela TimescaleDB...")
 cur.execute("""
     CREATE TABLE IF NOT EXISTS device_data (
         id SERIAL PRIMARY KEY,
-        device_id TEXT UNIQUE,
+        device_id TEXT,
         data JSONB,
         created_at TIMESTAMPTZ DEFAULT NOW()
     );
@@ -46,49 +32,56 @@ conn.commit()
 
 print("Tabela criada com sucesso ou já existia.")
 
-devices = acs.device_get_all_IDs()
-print(f"Dispositivos encontrados: {len(devices)}")
+# Definir o ID do dispositivo específico
+specific_device_id = "5091E3-EX141-2237011003026"  # Substitua pelo ID real do dispositivo desejado
+interval = 1  # Intervalo em segundos (30 segundos)
 
-def change_SSID(rede1, rede2):
-    acs.task_set_parameter_values(device_id, ["Device.WiFi.SSID.1.SSID", rede1])
-    acs.task_set_parameter_values(device_id, [["Device.WiFi.SSID.3.SSID", rede2]])
-    print("done SSID")
+def refresh_parameter_in_genieacs():
+    print(f"Atualizando parâmetro para o dispositivo {specific_device_id}...")
+    task_id = acs.task_refresh_object(specific_device_id, "Device.WiFi.MultiAP.APDevice.1.Radio.1.AP.2.AssociatedDevice.4.SignalStrength")
+    print(f"Parâmetro atualizado com sucesso. Task ID: {task_id}")
 
-def change_Password(senha):
-    acs.task_set_parameter_values(device_id, [["Device.WiFi.AccessPoint.1.Security.KeyPassphrase", senha]])
-    acs.task_set_parameter_values(device_id, [["Device.WiFi.AccessPoint.3.Security.KeyPassphrase", senha]])
-    print("done password")
+def download_signal_strength_to_timescale():
+    print(f"Coletando dados de intensidade de sinal para dispositivo {specific_device_id}...")
+    signal_strength = acs.device_get_parameter(specific_device_id, "Device.WiFi.MultiAP.APDevice.1.Radio.1.AP.2.AssociatedDevice.4.SignalStrength")
+    
+    # Verifique a estrutura dos dados coletados
+    print("Dados coletados (json):", signal_strength)
 
-def download_file_to_timescale():
-    for device in devices:
-        print(f"Coletando dados para dispositivo {device}...")
-        device_data = acs.device_get_parameter(device, "Device.WiFi.SSID.1.SSID")
-        
-        if not device_data:
-            print(f"Nenhum dado coletado para o dispositivo {device}")
-            continue
-        
-        print(f"Dados coletados para {device}: {device_data}")
+    if not signal_strength:
+        print(f"Nenhum dado de intensidade de sinal coletado para o dispositivo {specific_device_id}")
+        return
 
-        try:
-            # Inserir dados no TimescaleDB com conflito resolvido
-            cur.execute("""
-                INSERT INTO device_data (device_id, data)
-                VALUES (%s, %s)
-                ON CONFLICT (device_id)
-                DO UPDATE SET data = EXCLUDED.data, created_at = NOW();
-            """, (device, json.dumps(device_data)))
-            conn.commit()
-            print(f"Device data inserted for {device}")
-        except Exception as e:
-            print(f"Erro ao inserir dados para o dispositivo {device}: {e}")
+    # Certifique-se de que o dado não é nulo ou vazio
+    if signal_strength is None or signal_strength == "":
+        print("Dado de intensidade de sinal está vazio.")
+        return
 
-download_file_to_timescale()
-print("done final")
+    try:
+        # Inserir dados no TimescaleDB acumulando-os
+        formatted_data = json.dumps({"Device.WiFi.MultiAP.APDevice.1.Radio.1.AP.2.AssociatedDevice.4.SignalStrength": signal_strength})
+        cur.execute("""
+            INSERT INTO device_data (device_id, data, created_at)
+            VALUES (%s, %s, NOW());
+        """, (specific_device_id, formatted_data))
+        conn.commit()
+        print(f"Signal strength data inserted for {specific_device_id}")
+    except Exception as e:
+        print(f"Erro ao inserir dados de intensidade de sinal para o dispositivo {specific_device_id}: {e}")
+
+# Loop para atualização contínua
+try:
+    while True:
+        refresh_parameter_in_genieacs()  # Atualizar parâmetro no GenieACS
+        download_signal_strength_to_timescale()  # Coletar e inserir dados no TimescaleDB
+        time.sleep(interval)
+except KeyboardInterrupt:
+    print("Interrompido pelo usuário. Fechando conexões.")
 
 # Fechar a conexão com TimescaleDB
 cur.close()
 conn.close()
+
 
 
 
