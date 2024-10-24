@@ -9,14 +9,14 @@ from datetime import datetime
 import time
 import psycopg2
 import os
-import glob
 
 # Create a Connection object to interact with a GenieACS server
-acs = genieacs.Connection("*", auth=True, user="*", passwd="*", port="7557")
+acs = genieacs.Connection()
 
 # set a device_id for the following methods
 
 devices = acs.device_get_all_IDs()
+device_id = "5091E3-EX141-2237011003026"
 
 #brincando...
 #Mudando a Rede e Senha do Wifi
@@ -55,16 +55,11 @@ def get_wifi_stats():
             for j in range(1, 3):
                 for k in range(1, 3): 
                     parameters.extend([
-                        f"Device.WiFi.MultiAP.APDevice.1.Radio.{k}.AP.{j}.AssociatedDevice.{i}.Active",
-                        f"Device.WiFi.MultiAP.APDevice.1.Radio.{k}.AP.{j}.AssociatedDevice.{i}.X_TP_HostName",
                         f"Device.WiFi.MultiAP.APDevice.1.Radio.{k}.AP.{j}.AssociatedDevice.{i}.MacAddress",
                         f"Device.WiFi.MultiAP.APDevice.1.Radio.{k}.AP.{j}.AssociatedDevice.{i}.Stats.BytesReceived",
                         f"Device.WiFi.MultiAP.APDevice.1.Radio.{k}.AP.{j}.AssociatedDevice.{i}.Stats.BytesSent",
                         f"Device.WiFi.MultiAP.APDevice.1.Radio.{k}.AP.{j}.AssociatedDevice.{i}.Stats.PacketsReceived",
                         f"Device.WiFi.MultiAP.APDevice.1.Radio.{k}.AP.{j}.AssociatedDevice.{i}.Stats.PacketsSent",
-                        f"Device.WiFi.MultiAP.APDevice.1.Radio.{k}.AP.{j}.AssociatedDevice.{i}.Stats.ErrorsReceived",
-                        f"Device.WiFi.MultiAP.APDevice.1.Radio.{k}.AP.{j}.AssociatedDevice.{i}.Stats.ErrorsSent",
-                        f"Device.WiFi.MultiAP.APDevice.1.Radio.{k}.AP.{j}.AssociatedDevice.{i}.Stats.RetransCount"
                     ])
         output = []
         for param in parameters:
@@ -76,6 +71,56 @@ def get_wifi_stats():
             for param, value in output:
                 print(f"  Parameter: {param}, Value: {value}")
     print("done wifi stats")
+
+def get_ethernet_stats():
+    for device in devices:
+        refresh_device_parameter(device, "Device.WiFi.MultiAP.APDevice.1.X_TP_Ethernet.AssociatedDevice") #D0:94:66:A1:1B:58
+        parameters = []
+        for i in range(1, 4):  # Assuming there are up to 5 ethernet interfaces, adjust the range as needed
+            parameters.extend([
+                f"Device.WiFi.MultiAP.APDevice.1.X_TP_Ethernet.AssociatedDevice.{i}.IPAddress",
+                f"Device.WiFi.MultiAP.APDevice.1.X_TP_Ethernet.AssociatedDevice.{i}.MACAddress",
+                f"Device.WiFi.MultiAP.APDevice.1.X_TP_Ethernet.AssociatedDevice.{i}.PacketReceived",
+                f"Device.WiFi.MultiAP.APDevice.1.X_TP_Ethernet.AssociatedDevice.{i}.PacketsSent",
+                f"Device.WiFi.MultiAP.APDevice.1.X_TP_Ethernet.AssociatedDevice.{i}.BytesReceived",
+                f"Device.WiFi.MultiAP.APDevice.1.X_TP_Ethernet.AssociatedDevice.{i}.BytesSent",
+            ])
+        output = []
+        for param in parameters:
+            value = acs.device_get_parameter(device, param)
+            if value is not None:
+                output.append((param, value))
+        if output:
+            print(f"Device: {device}")
+            for param, value in output:
+                print(f"  Parameter: {param}, Value: {value}")
+    print("done ethernet stats")
+
+def download_ethernet_stats_to_csv():
+    with open(r'/home/localuser/Documentos/VSCode/genieacs/ethernet_stats.csv', 'w', newline='') as csvfile:
+        csvwriter = csv.writer(csvfile)
+        csvwriter.writerow(['Time', 'Device', 'Parameter', 'Value'])  # Write the header row
+        for device in devices:
+            parameters = []
+            for i in range(1, 5):  # Assuming there are up to 5 ethernet interfaces, adjust the range as needed
+                parameters.extend([
+                    f"Device.WiFi.MultiAP.APDevice.1.X_TP_Ethernet.AssociatedDevice.{i}.IPAddress",
+                    f"Device.WiFi.MultiAP.APDevice.1.X_TP_Ethernet.AssociatedDevice.{i}.MACAddress",
+                    f"Device.WiFi.MultiAP.APDevice.1.X_TP_Ethernet.AssociatedDevice.{i}.PacketReceived",
+                    f"Device.WiFi.MultiAP.APDevice.1.X_TP_Ethernet.AssociatedDevice.{i}.PacketsSent",
+                    f"Device.WiFi.MultiAP.APDevice.1.X_TP_Ethernet.AssociatedDevice.{i}.BytesReceived",
+                    f"Device.WiFi.MultiAP.APDevice.1.X_TP_Ethernet.AssociatedDevice.{i}.BytesSent",
+                ])
+            output = []
+            for param in parameters:
+                value = acs.device_get_parameter(device, param)
+                if value is not None:
+                    output.append((param, value))
+            if output:
+                time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')  # Get current timestamp
+                for param, value in output:
+                    csvwriter.writerow([time, device, param, value])  # Add timestamp to the row
+    print("done ethernet stats to csv")
 
 def download_file_json():
     for device in devices:
@@ -99,7 +144,7 @@ def create_table():
 
     # Criar tabela se não existir
     cursor.execute("""
-    CREATE TABLE IF NOT EXISTS wifi_stats (
+    CREATE TABLE IF NOT EXISTS ethernet_stats (
         time TIMESTAMPTZ NOT NULL,
         device TEXT NOT NULL,
         parameter TEXT NOT NULL,
@@ -108,7 +153,7 @@ def create_table():
     """)
 
     # Criar uma tabela de séries temporais
-    cursor.execute("SELECT create_hypertable('wifi_stats', 'time');")
+    cursor.execute("SELECT create_hypertable('ethernet_stats', 'time');")
 
     conn.commit()
     cursor.close()
@@ -158,50 +203,27 @@ def treat_csv_data(csv_file_name):
             except ValueError:
                 print(f"Valor inválido encontrado: {row[3]} não é um número.")
 
-def download_wifi_stats_to_csv():
-    with open(r'C:\Users\korin\OneDrive\Documentos\Códigos\Land\wifi_stats.csv', 'w', newline='') as csvfile:
-        csvwriter = csv.writer(csvfile)
-        csvwriter.writerow(['Time', 'Device', 'Parameter', 'Value'])  # Write the header row
-        for device in devices:
-            parameters = []
-            for i in range(1, 11):  # Assuming there are up to 10 associated devices, adjust the range as needed
-                for j in range(1, 3):
-                    for k in range(1, 3): 
-                        parameters.extend([
-                            f"Device.WiFi.MultiAP.APDevice.1.Radio.{k}.AP.{j}.AssociatedDevice.{i}.Active",
-                            f"Device.WiFi.MultiAP.APDevice.1.Radio.{k}.AP.{j}.AssociatedDevice.{i}.X_TP_HostName",
-                            f"Device.WiFi.MultiAP.APDevice.1.Radio.{k}.AP.{j}.AssociatedDevice.{i}.MacAddress",
-                            f"Device.WiFi.MultiAP.APDevice.1.Radio.{k}.AP.{j}.AssociatedDevice.{i}.Stats.BytesReceived",
-                            f"Device.WiFi.MultiAP.APDevice.1.Radio.{k}.AP.{j}.AssociatedDevice.{i}.Stats.BytesSent",
-                            f"Device.WiFi.MultiAP.APDevice.1.Radio.{k}.AP.{j}.AssociatedDevice.{i}.Stats.PacketsReceived",
-                            f"Device.WiFi.MultiAP.APDevice.1.Radio.{k}.AP.{j}.AssociatedDevice.{i}.Stats.PacketsSent",
-                            f"Device.WiFi.MultiAP.APDevice.1.Radio.{k}.AP.{j}.AssociatedDevice.{i}.Stats.ErrorsReceived",
-                            f"Device.WiFi.MultiAP.APDevice.1.Radio.{k}.AP.{j}.AssociatedDevice.{i}.Stats.ErrorsSent",
-                            f"Device.WiFi.MultiAP.APDevice.1.Radio.{k}.AP.{j}.AssociatedDevice.{i}.Stats.RetransCount"
-                        ])
-            output = []
-            for param in parameters:
-                value = acs.device_get_parameter(device, param)
-                if value is not None:
-                    output.append((param, value))
-            if output:
-                time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')  # Get current timestamp
-                for param, value in output:
-                    csvwriter.writerow([time, device, param, value])  # Add timestamp to the row
-    print("done wifi stats to csv")
-
-
 
 #get_wifi_stats() 
 #download_wifi_stats_to_csv()
-#treat_csv_data('wifi_stats.csv')
+#treat_csv_data('ethernet_stats.csv')
 #create_table()
-#insert_csv_to_timescaledb('wifi_stats_treated.csv')
+#insert_csv_to_timescaledb('ethernet_stats_treated.csv')
+while True:
+    refresh_device_parameter(device_id, "Device.WiFi.MultiAP.APDevice.1.X_TP_Ethernet.AssociatedDevice")
+    time.sleep(5) 
+    print(acs.device_get_parameter(device_id, "Device.WiFi.MultiAP.APDevice.1.X_TP_Ethernet.AssociatedDevice.1.BytesReceived"))    
+    time.sleep(5)
+
+refresh_device_parameter(device_id, "Device.WiFi.MultiAP.APDevice.1.X_TP_Ethernet.AssociatedDevice")
+print(acs.device_get_parameter(device_id, "Device.WiFi.MultiAP.APDevice.1.X_TP_Ethernet.AssociatedDevice.1.BytesReceived"))
+#download_ethernet_stats_to_csv()
 print("done final")
 
 
 
-
+#3797159144 
+#369651989
 '''
 # refresh some device parameters
 acs.task_refresh_object(device_id, "InternetGatewayDevice.DeviceInfo.")
