@@ -5,17 +5,16 @@ import time
 
 # Conectar ao GenieACS
 print("Conectando ao GenieACS...")
-acs = genieacs.Connection("", auth=True, user="", passwd="", port="")
+acs = genieacs.Connection("10.246.3.119", auth=True, user="admin", passwd="admin", port="7557")
 
 # Conectar ao TimescaleDB
 print("Conectando ao TimescaleDB...")
 conn = psycopg2.connect(
-    host="",
-    database="",
-    user="",
-    password=""
+    host="10.246.3.111",
+    database="otherparameters",
+    user="postgres",
+    password="landufrj123"
 )
-
 cur = conn.cursor()
 
 # Criar tabela TimescaleDB (sem restrições de unicidade)
@@ -29,58 +28,86 @@ cur.execute("""
     );
 """)
 conn.commit()
-
 print("Tabela criada com sucesso ou já existia.")
 
 # Definir o ID do dispositivo específico
-specific_device_id = ""  # Substitua pelo ID real do dispositivo desejado
-interval = 1  # Intervalo em segundos (30 segundos)
+specific_device_id = "5091E3-Device2-22370N7004407"  # Substitua pelo ID real do dispositivo desejado
+interval = 30  # Intervalo em segundos
 
-def refresh_parameter_in_genieacs():
-    print(f"Atualizando parâmetro para o dispositivo {specific_device_id}...")
-    task_id = acs.task_refresh_object(specific_device_id, "Device.WiFi.MultiAP.APDevice.1.Radio.1.AP.2.AssociatedDevice.4.SignalStrength")
-    print(f"Parâmetro atualizado com sucesso. Task ID: {task_id}")
+# Função para listar todos os parâmetros disponíveis
+def list_bulk_data_parameters():
+    bulk_data_parameters = []
+    index = 1
+    while True:
+        parameter_name = f"Device.BulkData.Profile.2.Parameter.{index}.Reference"
+        try:
+            response = acs.device_get_parameter(specific_device_id, parameter_name)
+            if response and response != "":
+                bulk_data_parameters.append(parameter_name)
+            else:
+                break
+        except genieacs.ConnectionError as e:
+            print(f"Erro ao obter o parâmetro {parameter_name}: {e}")
+            break
+        index += 1
+    return bulk_data_parameters
 
-def download_signal_strength_to_timescale():
-    print(f"Coletando dados de intensidade de sinal para dispositivo {specific_device_id}...")
-    signal_strength = acs.device_get_parameter(specific_device_id, "Device.WiFi.MultiAP.APDevice.1.Radio.1.AP.2.AssociatedDevice.4.SignalStrength")
-    
-    # Verifique a estrutura dos dados coletados
-    print("Dados coletados (json):", signal_strength)
+# Coletar parâmetros disponíveis
+bulk_data_parameters = list_bulk_data_parameters()
+print("Parâmetros coletados:", bulk_data_parameters)
 
-    if not signal_strength:
-        print(f"Nenhum dado de intensidade de sinal coletado para o dispositivo {specific_device_id}")
-        return
+def refresh_parameters_in_genieacs():
+    print(f"Atualizando parâmetros para o dispositivo {specific_device_id}...")
+    for parameter in bulk_data_parameters:
+        task_id = acs.task_refresh_object(specific_device_id, parameter)
+        print(f"Parâmetro {parameter} atualizado com sucesso. Task ID: {task_id}")
 
-    # Certifique-se de que o dado não é nulo ou vazio
-    if signal_strength is None or signal_strength == "":
-        print("Dado de intensidade de sinal está vazio.")
+def download_bulkdata_to_timescale():
+    print(f"Coletando dados para o dispositivo {specific_device_id}...")
+    device_data = {}
+    for parameter in bulk_data_parameters:
+        reference_parameter = acs.device_get_parameter(specific_device_id, parameter)
+        print(f"Referência obtida para {parameter}: {reference_parameter}")
+        if reference_parameter and reference_parameter != "":
+            data = acs.device_get_parameter(specific_device_id, reference_parameter)
+            print(f"Dados obtidos para {reference_parameter}: {data}")
+            if data:
+                device_data[reference_parameter] = data
+            else:
+                print(f"Nenhum dado coletado para o parâmetro referenciado {reference_parameter}")
+        else:
+            print(f"Nenhuma referência encontrada para o parâmetro {parameter}")
+
+    if not device_data:
+        print(f"Nenhum dado coletado para o dispositivo {specific_device_id}")
         return
 
     try:
         # Inserir dados no TimescaleDB acumulando-os
-        formatted_data = json.dumps({"Device.WiFi.MultiAP.APDevice.1.Radio.1.AP.2.AssociatedDevice.4.SignalStrength": signal_strength})
+        formatted_data = json.dumps(device_data)
+        print(f"Dados formatados para inserção: {formatted_data}")
         cur.execute("""
             INSERT INTO device_data (device_id, data, created_at)
             VALUES (%s, %s, NOW());
         """, (specific_device_id, formatted_data))
         conn.commit()
-        print(f"Signal strength data inserted for {specific_device_id}")
+        print(f"Dados inseridos para {specific_device_id}")
     except Exception as e:
-        print(f"Erro ao inserir dados de intensidade de sinal para o dispositivo {specific_device_id}: {e}")
+        print(f"Erro ao inserir dados para o dispositivo {specific_device_id}: {e}")
 
 # Loop para atualização contínua
 try:
     while True:
-        refresh_parameter_in_genieacs()  # Atualizar parâmetro no GenieACS
-        download_signal_strength_to_timescale()  # Coletar e inserir dados no TimescaleDB
-        time.sleep(interval)
+        refresh_parameters_in_genieacs()  # Atualizar parâmetros no GenieACS
+        download_bulkdata_to_timescale()  # Coletar e inserir dados no TimescaleDB
+        time.sleep(interval)  # Intervalo de 30 segundos
 except KeyboardInterrupt:
     print("Interrompido pelo usuário. Fechando conexões.")
 
 # Fechar a conexão com TimescaleDB
 cur.close()
 conn.close()
+
 
 
 
