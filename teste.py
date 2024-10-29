@@ -11,9 +11,9 @@ import psycopg2
 import os
 
 # Create a Connection object to interact with a GenieACS server
-acs = genieacs.Connection(ip="10.246.3.119", auth=True, user="admin", passwd="admin", port="7557")
+acs = genieacs.Connection()
 # Conexão ao TimescaleDB
-conn = psycopg2.connect(dbname="testegenie", user="postgres", password="landufrj123", host="10.246.3.111", port="5432")
+conn = psycopg2.connect()
 
 # set a device_id for the following methods
 devices = acs.device_get_all_IDs() # Get all devices available
@@ -321,9 +321,6 @@ def config_bulkdata_profile(profile_number, option, value):
         else:
             print("Failed to change Password")
     
-
-
-config_bulkdata_profile(1, "URL", "http://10.246.3.111:5432")
 print("done final")
 
 
