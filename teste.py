@@ -11,12 +11,11 @@ import psycopg2
 import os
 
 # Create a Connection object to interact with a GenieACS server
-acs = genieacs.Connection()
+acs = genieacs.Connection(ip="10.246.3.119", auth=True, user="admin", passwd="admin", port="7557")
 # Conexão ao TimescaleDB
-conn = psycopg2.connect()
+conn = psycopg2.connect(dbname="testegenie", user="postgres", password="landufrj123", host="10.246.3.111", port="5432")
 
 # set a device_id for the following methods
-
 devices = acs.device_get_all_IDs() # Get all devices available
 device_id = "98254A-Device2-223C1S5004290"
 
@@ -292,8 +291,39 @@ def get_all_bulkdata_profile_parameter_values(profile_number):
         except Exception as e:
             print(f"Failed to get parameter {i} in profile {profile_number}: {str(e)}")
 
+def config_bulkdata_profile(profile_number, option, value):
+    refresh_device_parameter(device_id, "Device.BulkData.Profile")
+    if option == "URL":
+        print(f"Changing URL to {value}")
+        acs.task_set_parameter_values(device_id, [[f"Device.BulkData.Profile.{profile_number}.HTTP.URL", value]])
+        refresh_device_parameter(device_id, f"Device.BulkData.Profile.{profile_number}.HTTP.URL")
+        check_url = acs.device_get_parameter(device_id, f"Device.BulkData.Profile.{profile_number}.HTTP.URL")
+        if value == check_url: 
+            print("URL has been changed successfully")
+        else:
+            print("Failed to change URL")
+    if option == "Username":
+        print(f"Changing Username to {value}")
+        acs.task_set_parameter_values(device_id, [[f"Device.BulkData.Profile.{profile_number}.HTTP.Username", value]])
+        refresh_device_parameter(device_id, f"Device.BulkData.Profile.{profile_number}.HTTP.Username")
+        check_username = acs.device_get_parameter(device_id, f"Device.BulkData.Profile.{profile_number}.HTTP.Username")
+        if value == check_username:
+            print("Username has been changed successfully")
+        else:
+            print("Failed to change Username")
+    if option == "Password":
+        print(f"Changing Password to {value}")
+        acs.task_set_parameter_values(device_id, [[f"Device.BulkData.Profile.{profile_number}.HTTP.Password", value]])
+        refresh_device_parameter(device_id, f"Device.BulkData.Profile.{profile_number}.HTTP.Password")
+        check_password = acs.device_get_parameter(device_id, f"Device.BulkData.Profile.{profile_number}.HTTP.Password")
+        if value == check_password:
+            print("Password has been changed successfully")
+        else:
+            print("Failed to change Password")
+    
 
-get_all_bulkdata_profile_parameter_values(1)
+
+config_bulkdata_profile(1, "URL", "http://10.246.3.111:5432")
 print("done final")
 
 
