@@ -12,29 +12,29 @@ import os
 
 # Create a Connection object to interact with a GenieACS server
 acs = genieacs.Connection()
-
 # Conexão ao TimescaleDB
 conn = psycopg2.connect()
 
 # set a device_id for the following methods
 
-devices = acs.device_get_all_IDs()
-device_id = "5091E3-EX141-2237011003026"
+devices = acs.device_get_all_IDs() # Get all devices available
+device_id = "98254A-Device2-223C1S5004290"
 
 #brincando...
+
 #Mudando a Rede e Senha do Wifi
 
-def change_SSID(rede1, rede2):
+def change_SSID(rede1, rede2): # Change the SSID of a network
     acs.task_set_parameter_values(device_id, ["Device.WiFi.SSID.1.SSID", rede1])
     acs.task_set_parameter_values(device_id, [["Device.WiFi.SSID.3.SSID", rede2]])
     print("done SSID")
 
-def change_Password(senha):
+def change_Password(senha): # Change the password of a network
     acs.task_set_parameter_values(device_id, [["Device.WiFi.AccessPoint.1.Security.KeyPassphrase", senha]])
     acs.task_set_parameter_values(device_id, [["Device.WiFi.AccessPoint.3.Security.KeyPassphrase", senha]])
     print("done password")
 
-def refresh_device_parameter(device,parameter):
+def refresh_device_parameter(device,parameter): # Refresh some giving paramater
     print(f"Starting refresh for device {device}")
     try:
         # Refreshe o caminho da árvore completa
@@ -136,13 +136,6 @@ def download_file_json():
 
 def create_table():
     # Conexão ao TimescaleDB
-    conn = psycopg2.connect(
-        dbname="testegenie",
-        user="postgres",
-        password="landufrj123",
-        host="10.246.3.111",
-        port="5432"
-    )
     cursor = conn.cursor()
 
     # Criar tabela se não existir
@@ -198,27 +191,113 @@ def treat_csv_data(csv_file_name):
             except ValueError:
                 print(f"Valor inválido encontrado: {row[3]} não é um número.")
 
+def create_bulkdata_profile(profile_number, name):
+    """
+    Create or update a bulk data profile with the given name in the specified profile slot.
 
-#get_wifi_stats() 
-#download_wifi_stats_to_csv()
-#treat_csv_data('ethernet_stats.csv')
-#create_table()
-#insert_csv_to_timescaledb('ethernet_stats_treated.csv')
-while True:
-    refresh_device_parameter(device_id, "Device.WiFi.MultiAP.APDevice.1.X_TP_Ethernet.AssociatedDevice")
-    time.sleep(5) 
-    print(acs.device_get_parameter(device_id, "Device.WiFi.MultiAP.APDevice.1.X_TP_Ethernet.AssociatedDevice.1.BytesReceived"))    
-    time.sleep(5)
+    :param profile_number: The profile number (1, 2, or 3)
+    :param name: The name to set for the profile
+    """
+    if profile_number not in [1, 2, 3]:
+        print("Invalid profile number. Please choose 1, 2, or 3.")
+        return
 
-refresh_device_parameter(device_id, "Device.WiFi.MultiAP.APDevice.1.X_TP_Ethernet.AssociatedDevice")
-print(acs.device_get_parameter(device_id, "Device.WiFi.MultiAP.APDevice.1.X_TP_Ethernet.AssociatedDevice.1.BytesReceived"))
-#download_ethernet_stats_to_csv()
+    tree = f"Device.BulkData.Profile.{profile_number}"
+    parameter1 = f"{tree}.Name"
+    parameter2 = f"{tree}.Enable"
+    
+    acs.task_set_parameter_values(device_id, [[parameter1, name]])
+    acs.task_set_parameter_values(device_id, [[parameter2, "true"]])
+    acs.task_refresh_object(device_id, tree)
+    time.sleep(10)
+    print(f"Bulk data profile '{name}' created successfully in profile slot {profile_number}.")
+
+def see_profiles():
+    acs.task_refresh_object(device_id, "Device.BulkData.Profile")
+    for i in range(1, 4):    
+        try:
+            value_status = acs.device_get_parameter(device_id, f"Device.BulkData.Profile.{i}.Enable")
+            value_name = acs.device_get_parameter(device_id, f"Device.BulkData.Profile.{i}.Name")
+            print(f"Current status of profile {value_name} ({i}): {value_status}")
+        except Exception as e:
+            print(f"Failed to get profile {i}: {str(e)}")
+    
+def set_bulkdata_profile_parameter(profile_number, name, parameter):
+    """
+    Define a specific parameter within a given bulk data profile.
+
+    :param profile_number: The profile number (1, 2, or 3)
+    :param parameter: The parameter to set within the profile
+    :param value: The value to set for the parameter
+    """
+    tree = f"Device.BulkData.Profile.{profile_number}.Parameter"
+    try:
+        refresh_device_parameter(device_id, tree)
+        for i in range(1, 43):
+            current_param = f"{tree}.{i}.Name"
+            existing_value = acs.device_get_parameter(device_id, current_param)
+            if not existing_value:
+                acs.task_set_parameter_values(device_id, [[current_param, name]])
+                acs.task_set_parameter_values(device_id, [[f"{tree}.{i}.Reference", parameter]])
+                break
+        time.sleep(10)
+        # Verify if the parameter was set correctly
+        saved_value = acs.device_get_parameter(device_id, f"{tree}.{i}.Reference")
+        if saved_value == parameter:
+            print(f"Parameter {i} set to '{parameter}' in parameter {i} in profile {profile_number} successfully.")
+        else:
+            print(f"Failed to set parameter '{parameter}' in profile {profile_number}.")
+    except Exception as e:
+        print(f"Error setting parameter '{parameter}' in profile {profile_number}: {str(e)}")
+
+def see_bulkdata_parameters(profile_number):
+    for i in range(1, 43):
+        try:
+            value_name = acs.device_get_parameter(device_id, f"Device.BulkData.Profile.{profile_number}.Parameter.{i}.Name")
+            if value_name:
+                print(f"Parameter {i} in profile {profile_number}: {value_name}")
+        except Exception as e:
+            print(f"Failed to get parameter {i} in profile {profile_number}: {str(e)}")
+            
+        except Exception as e:
+            print(f"Failed to get parameter {i} in profile {profile_number}: {str(e)}")
+
+def get_bulkdata_profile_parameter_value(profile_number, parameter_number):
+    refresh_device_parameter(device_id, f"Device.BulkData.Profile.{profile_number}")
+    value = acs.device_get_parameter(device_id, f"Device.BulkData.Profile.{profile_number}.Parameter.{parameter_number}.Reference")
+    value2 = acs.device_get_parameter(device_id, value)
+    print(f'The value of parameter {value} is: {value2}')
+
+def get_all_bulkdata_profile_parameter_values(profile_number):
+    #refresh_device_parameter(device_id, f"Device.BulkData.Profile.{profile_number}")
+    last_param_index = 1
+    while True:
+        try:
+            value = acs.device_get_parameter(device_id, f"Device.BulkData.Profile.{profile_number}.Parameter.{last_param_index}.Reference")
+            if not value:
+                break
+            value2 = acs.device_get_parameter(device_id, value)
+            #print(f"Parameter {last_param_index}({value}) in profile {profile_number}: {value2}")
+            last_param_index += 1
+        except Exception as e:
+            print(f"Failed to get parameter {last_param_index} in profile {profile_number}: {str(e)}")
+            break
+    for i in range(1, last_param_index): # Assuming there are up to 42 parameters, adjust the range as needed
+        try:
+            name_value = acs.device_get_parameter(device_id, f"Device.BulkData.Profile.{profile_number}.Parameter.{i}.Name")
+            if name_value:  # Check if the name is not empty or None
+                value = acs.device_get_parameter(device_id, f"Device.BulkData.Profile.{profile_number}.Parameter.{i}.Reference")
+                value2 = acs.device_get_parameter(device_id, value)
+                print(f"Parameter {i}({value}) in profile {profile_number}: {value2}")
+        except Exception as e:
+            print(f"Failed to get parameter {i} in profile {profile_number}: {str(e)}")
+
+
+get_all_bulkdata_profile_parameter_values(1)
 print("done final")
 
 
 
-#3797159144 
-#369651989
 '''
 # refresh some device parameters
 acs.task_refresh_object(device_id, "InternetGatewayDevice.DeviceInfo.")
@@ -307,4 +386,3 @@ faults = acs.fault_get_all_IDs()
 for fault in faults:
     acs.fault_delete(fault)
 '''
-
