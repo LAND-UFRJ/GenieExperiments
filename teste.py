@@ -32,7 +32,7 @@ print("Tabela criada com sucesso ou já existia.")
 
 # Definir o ID do dispositivo específico
 specific_device_id = ""  # Substitua pelo ID real do dispositivo desejado
-interval = 30  # Intervalo em segundos
+interval = 5  # Intervalo em segundos
 
 # Função para listar todos os parâmetros disponíveis
 def list_bulk_data_parameters():
