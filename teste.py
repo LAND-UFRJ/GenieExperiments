@@ -9,95 +9,94 @@ from datetime import datetime
 import time
 import psycopg2
 import os
+import threading
 
 # Create a Connection object to interact with a GenieACS server
-acs = genieacs.Connection()
+acs = genieacs.Connection(ip="10.246.3.119", auth=True, user="admin", passwd="admin", port="7557")
 # Conexão ao TimescaleDB
-conn = psycopg2.connect()
+conn = psycopg2.connect(dbname="testegenie", user="postgres", password="landufrj123", host="10.246.3.111", port="5432")
 
 # set a device_id for the following methods
-devices = acs.device_get_all_IDs() # Get all devices available
-device_id = "98254A-Device2-223C1S5004290"
+devices = acs.device_get_all_IDs()  # Get all devices available
+#device_id = "98254A-Device2-223C1S5004290"
 
-#brincando...
+# Function to execute a query and close the cursor
+def execute_query(query, var=None):
+    cursor = conn.cursor()
+    cursor.execute(query, var)
+    conn.commit()
+    cursor.close()
 
-#Mudando a Rede e Senha do Wifi
+# Function to set parameter values
+def set_parameter_values(device_id, parameters, value):
+    for param in parameters:
+        acs.task_set_parameter_values(device_id, [[param, value]])
+        refresh_device_parameter(device_id, param)
+        check = acs.device_get_parameter(device_id, param)
+        if check == value:
+            print(f"Successfully set parameter '{param}' to '{value}' for device '{device_id}'")
+        else:
+            print(f"Failed to set parameter '{param}' to '{value}' for device '{device_id}'")
 
-def change_SSID(rede1, rede2): # Change the SSID of a network
-    acs.task_set_parameter_values(device_id, ["Device.WiFi.SSID.1.SSID", rede1])
-    acs.task_set_parameter_values(device_id, [["Device.WiFi.SSID.3.SSID", rede2]])
-    print("done SSID")
-
-def change_Password(senha): # Change the password of a network
-    acs.task_set_parameter_values(device_id, [["Device.WiFi.AccessPoint.1.Security.KeyPassphrase", senha]])
-    acs.task_set_parameter_values(device_id, [["Device.WiFi.AccessPoint.3.Security.KeyPassphrase", senha]])
-    print("done password")
-
-def refresh_device_parameter(device,parameter): # Refresh some giving paramater
-    print(f"Starting refresh for device {device}")
+# Refresh some given parameters
+def refresh_device_parameter(device_id, parameter):
     try:
-        # Refreshe o caminho da árvore completa
-        acs.task_refresh_object(device, parameter)
-        time.sleep(10)
-        print(f"Successfully refreshed parameters for device '{device}'")
+        acs.task_refresh_object(device_id, parameter)
+        time.sleep(5)
+        #print(f"Successfully refreshed {parameter} for device '{device_id}'")
     except Exception as e:
-        print(f"Failed to refresh parameters for device '{device}': {str(e)}")
-
-def refresh_all_devices():
-    for device in devices:
-        refresh_device_parameter(device)
-        time.sleep(60)  # Pause entre as solicitações
-    print("Done refreshing all devices")
-
-def get_wifi_stats():
-    for device in devices:
-        refresh_device_parameter(device, "Device.WiFi.MultiAP.APDevice.1.Radio.")
-        parameters = []
-        for i in range(1, 15):  # Assuming there are up to 20 associated devices, adjust the range as needed
-            for j in range(1, 3):
-                for k in range(1, 3): 
-                    parameters.extend([
-                        f"Device.WiFi.MultiAP.APDevice.1.Radio.{k}.AP.{j}.AssociatedDevice.{i}.MacAddress",
-                        f"Device.WiFi.MultiAP.APDevice.1.Radio.{k}.AP.{j}.AssociatedDevice.{i}.Stats.BytesReceived",
-                        f"Device.WiFi.MultiAP.APDevice.1.Radio.{k}.AP.{j}.AssociatedDevice.{i}.Stats.BytesSent",
-                        f"Device.WiFi.MultiAP.APDevice.1.Radio.{k}.AP.{j}.AssociatedDevice.{i}.Stats.PacketsReceived",
-                        f"Device.WiFi.MultiAP.APDevice.1.Radio.{k}.AP.{j}.AssociatedDevice.{i}.Stats.PacketsSent",
-                    ])
-        output = []
-        for param in parameters:
-            value = acs.device_get_parameter(device, param)
-            if value is not None:
-                output.append((param, value))
-        if output:
-            print(f"Device: {device}")
-            for param, value in output:
-                print(f"  Parameter: {param}, Value: {value}")
+        print(f"Failed to refresh {parameter} for device '{device_id}': {str(e)}")
+        
+# Get WiFi stats
+def get_wifi_stats(device_id):
+    refresh_device_parameter(device_id, "Device.WiFi.MultiAP.APDevice.1.Radio.")
+    parameters = []
+    for i in range(1, 21):  # Assuming there are up to 20 associated devices, adjust the range as needed
+        for j in range(1, 3):
+            for k in range(1, 3):
+                parameters.extend([
+                    f"Device.WiFi.MultiAP.APDevice.1.Radio.{k}.AP.{j}.AssociatedDevice.{i}.MacAddress",
+                    f"Device.WiFi.MultiAP.APDevice.1.Radio.{k}.AP.{j}.AssociatedDevice.{i}.Stats.BytesReceived",
+                    f"Device.WiFi.MultiAP.APDevice.1.Radio.{k}.AP.{j}.AssociatedDevice.{i}.Stats.BytesSent",
+                    f"Device.WiFi.MultiAP.APDevice.1.Radio.{k}.AP.{j}.AssociatedDevice.{i}.Stats.PacketsReceived",
+                    f"Device.WiFi.MultiAP.APDevice.1.Radio.{k}.AP.{j}.AssociatedDevice.{i}.Stats.PacketsSent",
+                ])
+    output = []
+    for param in parameters:
+        value = acs.device_get_parameter(device_id, param)
+        if value is not None:
+            output.append((param, value))
+    if output:
+        print(f"Device: {device_id}")
+        for param, value in output:
+            print(f"  Parameter: {param}, Value: {value}")
     print("done wifi stats")
 
-def get_ethernet_stats():
-    for device in devices:
-        refresh_device_parameter(device, "Device.WiFi.MultiAP.APDevice.1.X_TP_Ethernet.AssociatedDevice") #D0:94:66:A1:1B:58
-        parameters = []
-        for i in range(1, 4):  # Assuming there are up to 5 ethernet interfaces, adjust the range as needed
-            parameters.extend([
-                f"Device.WiFi.MultiAP.APDevice.1.X_TP_Ethernet.AssociatedDevice.{i}.IPAddress",
-                f"Device.WiFi.MultiAP.APDevice.1.X_TP_Ethernet.AssociatedDevice.{i}.MACAddress",
-                f"Device.WiFi.MultiAP.APDevice.1.X_TP_Ethernet.AssociatedDevice.{i}.PacketReceived",
-                f"Device.WiFi.MultiAP.APDevice.1.X_TP_Ethernet.AssociatedDevice.{i}.PacketsSent",
-                f"Device.WiFi.MultiAP.APDevice.1.X_TP_Ethernet.AssociatedDevice.{i}.BytesReceived",
-                f"Device.WiFi.MultiAP.APDevice.1.X_TP_Ethernet.AssociatedDevice.{i}.BytesSent",
-            ])
-        output = []
-        for param in parameters:
-            value = acs.device_get_parameter(device, param)
-            if value is not None:
-                output.append((param, value))
-        if output:
-            print(f"Device: {device}")
-            for param, value in output:
-                print(f"  Parameter: {param}, Value: {value}")
+# Get Ethernet stats
+def get_ethernet_stats(device_id):
+    refresh_device_parameter(device_id, "Device.WiFi.MultiAP.APDevice.1.X_TP_Ethernet.AssociatedDevice")
+    parameters = []
+    for i in range(1, 4):  # Assuming there are up to 5 ethernet interfaces, adjust the range as needed
+        parameters.extend([
+            f"Device.WiFi.MultiAP.APDevice.1.X_TP_Ethernet.AssociatedDevice.{i}.IPAddress",
+            f"Device.WiFi.MultiAP.APDevice.1.X_TP_Ethernet.AssociatedDevice.{i}.MACAddress",
+            f"Device.WiFi.MultiAP.APDevice.1.X_TP_Ethernet.AssociatedDevice.{i}.PacketReceived",
+            f"Device.WiFi.MultiAP.APDevice.1.X_TP_Ethernet.AssociatedDevice.{i}.PacketsSent",
+            f"Device.WiFi.MultiAP.APDevice.1.X_TP_Ethernet.AssociatedDevice.{i}.BytesReceived",
+            f"Device.WiFi.MultiAP.APDevice.1.X_TP_Ethernet.AssociatedDevice.{i}.BytesSent",
+        ])
+    output = []
+    for param in parameters:
+        value = acs.device_get_parameter(device_id, param)
+        if value is not None:
+            output.append((param, value))
+    if output:
+        print(f"Device: {device_id}")
+        for param, value in output:
+            print(f"  Parameter: {param}, Value: {value}")
     print("done ethernet stats")
 
+# Download Ethernet stats to CSV
 def download_ethernet_stats_to_csv():
     with open(r'/home/localuser/Documentos/VSCode/genieacs/ethernet_stats.csv', 'w', newline='') as csvfile:
         csvwriter = csv.writer(csvfile)
@@ -124,6 +123,7 @@ def download_ethernet_stats_to_csv():
                     csvwriter.writerow([time, device, param, value])  # Add timestamp to the row
     print("done ethernet stats to csv")
 
+# Download file JSON
 def download_file_json():
     for device in devices:
         refresh_device_parameter(device, "Device.")
@@ -133,102 +133,81 @@ def download_file_json():
             json.dump(device_data, json_file, indent=4)
         print(f"Device data written to {json_file_path}")
 
-def create_table():
-    # Conexão ao TimescaleDB
-    cursor = conn.cursor()
-
-    # Criar tabela se não existir
-    cursor.execute("""
-    CREATE TABLE IF NOT EXISTS ethernet_stats (
+# Create table
+def create_table(name):
+    query = f"""
+    CREATE TABLE IF NOT EXISTS {name} (
         time TIMESTAMPTZ NOT NULL,
-        device TEXT NOT NULL,
-        parameter TEXT NOT NULL,
-        value FLOAT NOT NULL
+        device_id TEXT NOT NULL,
+        mac_address TEXT NOT NULL,
+        channel INTEGER NOT NULL,
+        frequency_band TEXT NOT NULL,
+        channel_bandwidth TEXT NOT NULL,
+        ssid TEXT NOT NULL,
+        signal_strength FLOAT NOT NULL
     );
-    """)
+    """
+    execute_query(query)
+    print(f"Table {name} created successfully")
 
-    # Criar uma tabela de séries temporais
-    cursor.execute("SELECT create_hypertable('ethernet_stats', 'time');")
+# Create hypertable
+def create_hypertable(name):
+    query = f"""
+    SELECT create_hypertable('{name}', 'time');
+    """
+    execute_query(query)
+    print(f"Hypertable {name} created successfully")
 
-    conn.commit()
-    cursor.close()
-    conn.close()
-
+# Insert CSV to TimescaleDB
 def insert_csv_to_timescaledb(csv_file_name):
     cursor = conn.cursor()
-    
-    # Abrir o arquivo CSV e inserir os dados
     with open(csv_file_name, 'r') as csvfile:
         next(csvfile)  # Pular o cabeçalho
         cursor.copy_from(csvfile, 'wifi_stats', sep=',', columns=('time', 'device', 'parameter', 'value'))
-    
-    conn.commit()  # Commit as mudanças
+    conn.commit()
     cursor.close()
-    conn.close()
     print("Data inserted successfully")
 
+# Treat CSV data
 def treat_csv_data(csv_file_name):
-    """Função para ler e limpar dados de um arquivo CSV.
-    
-    Salva os dados limpos em um novo arquivo CSV.
-    """
-    # Cria o nome do arquivo de saída
     base_name, ext = os.path.splitext(csv_file_name)
     output_csv_file_name = f"{base_name}_treated{ext}"
     with open(csv_file_name, 'r') as csvfile, open(output_csv_file_name, 'w', newline='') as outfile:
         reader = csv.reader(csvfile)
         writer = csv.writer(outfile)
-        
         header = next(reader)  # Pula o cabeçalho
         writer.writerow(header)  # Escreve o cabeçalho no novo arquivo
-        
         for row in reader:
             try:
-                # Tente converter 'value' para float
                 value = float(row[3])  # Assume que 'value' está na quarta coluna
                 writer.writerow(row)  # Escreve a linha no novo arquivo
             except ValueError:
                 print(f"Valor inválido encontrado: {row[3]} não é um número.")
 
-def create_bulkdata_profile(profile_number, name):
-    """
-    Create or update a bulk data profile with the given name in the specified profile slot.
-
-    :param profile_number: The profile number (1, 2, or 3)
-    :param name: The name to set for the profile
-    """
+# Create bulk data profile
+def create_bulkdata_profile(device_id,profile_number, name):
     if profile_number not in [1, 2, 3]:
         print("Invalid profile number. Please choose 1, 2, or 3.")
         return
-
     tree = f"Device.BulkData.Profile.{profile_number}"
-    parameter1 = f"{tree}.Name"
-    parameter2 = f"{tree}.Enable"
-    
-    acs.task_set_parameter_values(device_id, [[parameter1, name]])
-    acs.task_set_parameter_values(device_id, [[parameter2, "true"]])
-    acs.task_refresh_object(device_id, tree)
+    set_parameter_values(device_id, [[f"{tree}.Name", name], [f"{tree}.Enable", "true"]])
+    refresh_device_parameter(device_id, tree)
     time.sleep(10)
     print(f"Bulk data profile '{name}' created successfully in profile slot {profile_number}.")
 
-def see_profiles():
+# See profiles
+def see_profiles(device_id):
     acs.task_refresh_object(device_id, "Device.BulkData.Profile")
-    for i in range(1, 4):    
+    for i in range(1, 4):
         try:
             value_status = acs.device_get_parameter(device_id, f"Device.BulkData.Profile.{i}.Enable")
             value_name = acs.device_get_parameter(device_id, f"Device.BulkData.Profile.{i}.Name")
             print(f"Current status of profile {value_name} ({i}): {value_status}")
         except Exception as e:
             print(f"Failed to get profile {i}: {str(e)}")
-    
-def set_bulkdata_profile_parameter(profile_number, name, parameter):
-    """
-    Define a specific parameter within a given bulk data profile.
 
-    :param profile_number: The profile number (1, 2, or 3)
-    :param parameter: The parameter to set within the profile
-    :param value: The value to set for the parameter
-    """
+# Set bulk data profile parameter
+def set_bulkdata_profile_parameter(device_id, profile_number, name, parameter):
     tree = f"Device.BulkData.Profile.{profile_number}.Parameter"
     try:
         refresh_device_parameter(device_id, tree)
@@ -236,20 +215,19 @@ def set_bulkdata_profile_parameter(profile_number, name, parameter):
             current_param = f"{tree}.{i}.Name"
             existing_value = acs.device_get_parameter(device_id, current_param)
             if not existing_value:
-                acs.task_set_parameter_values(device_id, [[current_param, name]])
-                acs.task_set_parameter_values(device_id, [[f"{tree}.{i}.Reference", parameter]])
+                set_parameter_values(device_id, [[current_param, name], [f"{tree}.{i}.Reference", parameter]])
                 break
         time.sleep(10)
-        # Verify if the parameter was set correctly
         saved_value = acs.device_get_parameter(device_id, f"{tree}.{i}.Reference")
         if saved_value == parameter:
-            print(f"Parameter {i} set to '{parameter}' in parameter {i} in profile {profile_number} successfully.")
+            print(f"Parameter {i} set to '{parameter}' in profile {profile_number} successfully.")
         else:
             print(f"Failed to set parameter '{parameter}' in profile {profile_number}.")
     except Exception as e:
         print(f"Error setting parameter '{parameter}' in profile {profile_number}: {str(e)}")
 
-def see_bulkdata_parameters(profile_number):
+# See bulk data parameters
+def see_bulkdata_parameters(device_id, profile_number):
     for i in range(1, 43):
         try:
             value_name = acs.device_get_parameter(device_id, f"Device.BulkData.Profile.{profile_number}.Parameter.{i}.Name")
@@ -257,18 +235,16 @@ def see_bulkdata_parameters(profile_number):
                 print(f"Parameter {i} in profile {profile_number}: {value_name}")
         except Exception as e:
             print(f"Failed to get parameter {i} in profile {profile_number}: {str(e)}")
-            
-        except Exception as e:
-            print(f"Failed to get parameter {i} in profile {profile_number}: {str(e)}")
 
-def get_bulkdata_profile_parameter_value(profile_number, parameter_number):
+# Get bulk data profile parameter value
+def get_bulkdata_profile_parameter_value(device_id, profile_number, parameter_number):
     refresh_device_parameter(device_id, f"Device.BulkData.Profile.{profile_number}")
     value = acs.device_get_parameter(device_id, f"Device.BulkData.Profile.{profile_number}.Parameter.{parameter_number}.Reference")
     value2 = acs.device_get_parameter(device_id, value)
     print(f'The value of parameter {value} is: {value2}')
 
-def get_all_bulkdata_profile_parameter_values(profile_number):
-    #refresh_device_parameter(device_id, f"Device.BulkData.Profile.{profile_number}")
+# Get all bulk data profile parameter values
+def get_all_bulkdata_profile_parameter_values(device_id, profile_number):
     last_param_index = 1
     while True:
         try:
@@ -276,12 +252,11 @@ def get_all_bulkdata_profile_parameter_values(profile_number):
             if not value:
                 break
             value2 = acs.device_get_parameter(device_id, value)
-            #print(f"Parameter {last_param_index}({value}) in profile {profile_number}: {value2}")
             last_param_index += 1
         except Exception as e:
             print(f"Failed to get parameter {last_param_index} in profile {profile_number}: {str(e)}")
             break
-    for i in range(1, last_param_index): # Assuming there are up to 42 parameters, adjust the range as needed
+    for i in range(1, last_param_index):  # Assuming there are up to 42 parameters, adjust the range as needed
         try:
             name_value = acs.device_get_parameter(device_id, f"Device.BulkData.Profile.{profile_number}.Parameter.{i}.Name")
             if name_value:  # Check if the name is not empty or None
@@ -291,125 +266,110 @@ def get_all_bulkdata_profile_parameter_values(profile_number):
         except Exception as e:
             print(f"Failed to get parameter {i} in profile {profile_number}: {str(e)}")
 
-def config_bulkdata_profile(profile_number, option, value):
+# Config bulk data profile
+def config_bulkdata_profile(device_id, profile_number, option, value):
     refresh_device_parameter(device_id, "Device.BulkData.Profile")
-    if option == "URL":
-        print(f"Changing URL to {value}")
-        acs.task_set_parameter_values(device_id, [[f"Device.BulkData.Profile.{profile_number}.HTTP.URL", value]])
-        refresh_device_parameter(device_id, f"Device.BulkData.Profile.{profile_number}.HTTP.URL")
-        check_url = acs.device_get_parameter(device_id, f"Device.BulkData.Profile.{profile_number}.HTTP.URL")
-        if value == check_url: 
-            print("URL has been changed successfully")
+    option_map = {
+        "URL": "Device.BulkData.Profile.{profile_number}.HTTP.URL",
+        "Username": "Device.BulkData.Profile.{profile_number}.HTTP.Username",
+        "Password": "Device.BulkData.Profile.{profile_number}.HTTP.Password"
+    }
+    if option in option_map:
+        param = option_map[option].format(profile_number=profile_number)
+        print(f"Changing {option} to {value}")
+        set_parameter_values(device_id, [[param, value]])
+        refresh_device_parameter(device_id, param)
+        check_value = acs.device_get_parameter(device_id, param)
+        if value == check_value:
+            print(f"{option} has been changed successfully")
         else:
-            print("Failed to change URL")
-    if option == "Username":
-        print(f"Changing Username to {value}")
-        acs.task_set_parameter_values(device_id, [[f"Device.BulkData.Profile.{profile_number}.HTTP.Username", value]])
-        refresh_device_parameter(device_id, f"Device.BulkData.Profile.{profile_number}.HTTP.Username")
-        check_username = acs.device_get_parameter(device_id, f"Device.BulkData.Profile.{profile_number}.HTTP.Username")
-        if value == check_username:
-            print("Username has been changed successfully")
-        else:
-            print("Failed to change Username")
-    if option == "Password":
-        print(f"Changing Password to {value}")
-        acs.task_set_parameter_values(device_id, [[f"Device.BulkData.Profile.{profile_number}.HTTP.Password", value]])
-        refresh_device_parameter(device_id, f"Device.BulkData.Profile.{profile_number}.HTTP.Password")
-        check_password = acs.device_get_parameter(device_id, f"Device.BulkData.Profile.{profile_number}.HTTP.Password")
-        if value == check_password:
-            print("Password has been changed successfully")
-        else:
-            print("Failed to change Password")
-    
-print("done final")
+            print(f"Failed to change {option}")
+
+def get_data_from_timescale(name):
+    cursor = conn.cursor()
+    cursor.execute(f"SELECT * FROM {name}")
+    records = cursor.fetchall()
+    for row in records:
+        print(row)
+    cursor.close()
+
+def signal_strength(device_id):
+    mac_host_list = []
+    hostname_list = []
+    refresh_device_parameter(device_id, "Device.WiFi.AccessPoint")
+    refresh_device_parameter(device_id, "Device.Hosts")
+    entries_host = acs.device_get_parameter(device_id, "Device.Hosts.HostNumberOfEntries")
+
+    for k in range(1, entries_host + 1):
+        hostname = acs.device_get_parameter(device_id, f"Device.Hosts.Host.{k}.HostName")
+        mac_host = acs.device_get_parameter(device_id, f"Device.Hosts.Host.{k}.PhysAddress").lower()
+        mac_host_list.append(mac_host)
+        hostname_list.append(hostname)
+
+    for i in range(1, 15):  # Get signal strength for each accesspoint of this device
+        entries_ap = acs.device_get_parameter(device_id, f"Device.WiFi.AccessPoint.{i}.AssociatedDeviceNumberOfEntries")
+        if entries_ap != 0:
+            for j in range(1, entries_ap + 1):
+                signal_strength = acs.device_get_parameter(device_id, f'Device.WiFi.AccessPoint.{i}.AssociatedDevice.{j}.SignalStrength')
+                mac_associateddevice = acs.device_get_parameter(device_id, f"Device.WiFi.AccessPoint.{i}.AssociatedDevice.{j}.MACAddress")
+                if mac_associateddevice is not None:
+                    mac_associateddevice = mac_associateddevice.lower()
+                    # Check if mac_host matches mac_associateddevice and replace with hostname
+                    if mac_associateddevice in mac_host_list:
+                        index = mac_host_list.index(mac_associateddevice)
+                        hostname = hostname_list[index]
+                    else:
+                        hostname = "Unknown"
+
+                    # Insert data into TimescaleDB
+                    query = """
+                    INSERT INTO signal_strength (time, device_id, mac_address, hostname, signal_strength)
+                    VALUES (%s, %s, %s, %s, %s)
+                    """
+                    current_time = datetime.now()
+                    execute_query(query, (current_time, str(device_id), str(mac_associateddevice), str(hostname), int(signal_strength)))
+    print(f"Signal_Strength inserted successfully for {device_id}")
+
+def neighboring_wifi(device_id):
+    acs.task_set_parameter_values(device_id, [["Device.WiFi.NeighboringWiFiDiagnostic.DiagnosticsState", "Requested"]])
+    refresh_device_parameter(device_id, "Device.WiFi.NeighboringWiFiDiagnostic")
+    time.sleep(5)
+    entries = acs.device_get_parameter(device_id, "Device.WiFi.NeighboringWiFiDiagnostic.ResultNumberOfEntries")
+    for i in range(1, entries + 1):
+        mac = acs.device_get_parameter(device_id, f"Device.WiFi.NeighboringWiFiDiagnostic.Result.{i}.BSSID")
+        channel = acs.device_get_parameter(device_id, f"Device.WiFi.NeighboringWiFiDiagnostic.Result.{i}.Channel")
+        frequencyband = acs.device_get_parameter(device_id, f"Device.WiFi.NeighboringWiFiDiagnostic.Result.{i}.OperatingFrequencyBand")
+        channel_bandwidth = acs.device_get_parameter(device_id, f"Device.WiFi.NeighboringWiFiDiagnostic.Result.{i}.OperatingChannelBandwidth")
+        signal_strength = acs.device_get_parameter(device_id, f"Device.WiFi.NeighboringWiFiDiagnostic.Result.{i}.SignalStrength")
+        ssid = acs.device_get_parameter(device_id, f"Device.WiFi.NeighboringWiFiDiagnostic.Result.{i}.SSID")
+        #print(f"{i}. Device: {device_id} MAC: {mac}, Channel: {channel}, Frequency Band: {frequencyband}, Channel Bandwidth: {channel_bandwidth}, Signal Strength: {signal_strength}, SSID: {ssid}")
+        # Insert data into TimescaleDB
+        query = """
+        INSERT INTO neighboring_wifi (time, device_id, mac_address, channel, frequency_band, channel_bandwidth, ssid, signal_strength)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+        """
+        current_time = datetime.now()
+        execute_query(query, (current_time, str(device_id), str(mac), int(channel), str(frequencyband), str(channel_bandwidth), str(ssid), int(signal_strength)))
+    print(f"Neighboring_wifi inserted successfully for {device_id}")
+        
+def loop(device):
+    while True:
+        x = 0.5
+        y = 0.1
+        time.sleep(x)
+        signal_strength(device)
+        time.sleep(x)
+        neighboring_wifi(device)
+        time.sleep(y)
+
+#Main
+print(devices)
+threads = []
+for device in devices[:4]:  # Assuming you want to parallelize for the first four devices
+    t = threading.Thread(target=loop, args=(device,))
+    threads.append(t)
+    t.start()
 
 
-
-'''
-# refresh some device parameters
-acs.task_refresh_object(device_id, "InternetGatewayDevice.DeviceInfo.")
-# set a device parameter
-acs.task_set_parameter_values(device_id, [["InternetGatewayDevice.BackupConfiguration.FileList", "backup.cfg"]])
-# get a device parameter
-acs.task_get_parameter_values(device_id, [["InternetGatewayDevice.BackupConfiguration.FileList"]])
-# factory reset a device
-acs.task_factory_reset(device_id)
-# reboot a device
-acs.task_reboot(device_id)
-# add an object to a device
-acs.task_add_object(device_id, "VPNObject", [["InternetGatewayDevice.X_TDT-DE_OpenVPN"]])
-# download a file
-acs.task_download(device_id, "9823de165bb983f24f782951", "Firmware.img")
-# retry a faulty task
-acs.task_retry("9h4769svl789kjf984ll")
-
-
-# print all tasks of a given device
-print(acs.task_get_all(device_id))
-# print IDs of all devices
-print(acs.device_get_all_IDs())
-# search a device by its ID and print all corresponding data
-print(acs.device_get_by_id(device_id))
-# search a device by its MAC address and print all corresponding data
-print(acs.device_get_by_MAC("00:01:49:ff:0f:01"))
-# print the value of a given parameter of a given device
-print(acs.device_get_parameter(device_id, "InternetGatewayDevice.DeviceInfo.SoftwareVersion"))
-# print 2 given parameters of a given device
-print(acs.device_get_parameters(device_id, "InternetGatewayDevice.DeviceInfo.SoftwareVersion,InternetGatewayDevice.X_TDT-DE_Interface.2.ProtoStatic.Ipv4.Address"))
-# delete a task
-acs.task_delete("9h4769svl789kjf984ll")
-
-# create a new preset
-acs.preset_create("Tagging", r'{ "weight": 0, "precondition": "{\"_tags\":{\"$ne\":\"tagged\"}}", "configurations": [ { "type": "add_tag", "tag":"tagged" }] }')
-# write all existing presets to a file and store them in a json object
-preset_data = acs.preset_get_all('presets.json')
-# delete all presets
-for preset in preset_data:
-    acs.preset_delete(preset["_id"])
-# create all presets from the file
-acs.preset_create_all_from_file('presets.json')
-
-# create a new object
-acs.object_create("CreatedObject", r'{"Param1": "Value1", "Param2": "Value2", "_keys":["Param1"]}')
-# write all existing objects to a file and store them in a json object
-object_data = acs.object_get_all('objects.json')
-# delete all objects
-for gobject in object_data:
-    acs.object_delete(gobject["_id"])
-# create all objects from the file
-acs.object_create_all_from_file('objects.json')
-
-# create a new provision
-acs.provision_create("Logging", '// This is a comment\nlog("Hello World!");')
-# write all existing provisions to a file and store them in a json object
-provision_data = acs.provision_get_all('provisions.json')
-# delete all provisisions
-for provision in provision_data:
-    acs.provision_delete(provision["_id"])
-# create all provisions from the file
-acs.provision_create_all_from_file('provisions.json')
-
-# print all tags of a given device
-print(acs.tag_get_all(device_id))
-# assign a tag to a device
-acs.tag_assign(device_id, "tagged")
-# remove a tag from a device
-acs.tag_remove(device_id, "tagged")
-
-# print all existing files in the database
-print(acs.file_get_all())
-# print data of a specific file
-print(str(acs.file_get(fileType="12 Other File", version="0.4")))
-# upload a new or modified file
-acs.file_upload("Firmware.img", "1 Firmware Upgrade Image", "123456", "r4500", "2.0")
-# delete a file from the database
-acs.file_delete("Firmware.img")
-
-# delete the device from the database
-acs.device_delete(device_id)
-
-# get IDs of all existing faults and delete all
-faults = acs.fault_get_all_IDs()
-for fault in faults:
-    acs.fault_delete(fault)
-'''
+for t in threads:
+    t.join()
