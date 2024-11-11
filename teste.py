@@ -10,6 +10,7 @@ import time
 import psycopg2
 import os
 import threading
+from concurrent.futures import ThreadPoolExecutor
 
 # Create a Connection object to interact with a GenieACS server
 acs = genieacs.Connection(ip="10.246.3.119", auth=True, user="admin", passwd="admin", port="7557")
@@ -21,11 +22,15 @@ devices = acs.device_get_all_IDs()  # Get all devices available
 #device_id = "98254A-Device2-223C1S5004290"
 
 # Function to execute a query and close the cursor
-def execute_query(query, var=None):
+def execute_query(query, data):
     cursor = conn.cursor()
-    cursor.execute(query, var)
-    conn.commit()
-    cursor.close()
+    try:
+        cursor.executemany(query, data)
+        conn.commit()
+    except Exception as e:
+        print(f"Error executing query: {e}")
+    finally:
+        cursor.close()
 
 # Function to set parameter values
 def set_parameter_values(device_id, parameters, value):
@@ -42,11 +47,11 @@ def set_parameter_values(device_id, parameters, value):
 def refresh_device_parameter(device_id, parameter):
     try:
         acs.task_refresh_object(device_id, parameter)
-        time.sleep(5)
+        #time.sleep(2)
         #print(f"Successfully refreshed {parameter} for device '{device_id}'")
     except Exception as e:
         print(f"Failed to refresh {parameter} for device '{device_id}': {str(e)}")
-        
+
 # Get WiFi stats
 def get_wifi_stats(device_id):
     refresh_device_parameter(device_id, "Device.WiFi.MultiAP.APDevice.1.Radio.")
@@ -294,76 +299,90 @@ def get_data_from_timescale(name):
     cursor.close()
 
 def signal_strength(device_id):
-    mac_host_list = []
-    hostname_list = []
-    refresh_device_parameter(device_id, "Device.WiFi.AccessPoint")
-    refresh_device_parameter(device_id, "Device.Hosts")
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        executor.submit(refresh_device_parameter, device_id, "Device.WiFi.AccessPoint")
+        executor.submit(refresh_device_parameter, device_id, "Device.Hosts")
+    
     entries_host = acs.device_get_parameter(device_id, "Device.Hosts.HostNumberOfEntries")
-
+    mac_to_hostname = {}
     for k in range(1, entries_host + 1):
         hostname = acs.device_get_parameter(device_id, f"Device.Hosts.Host.{k}.HostName")
         mac_host = acs.device_get_parameter(device_id, f"Device.Hosts.Host.{k}.PhysAddress").lower()
-        mac_host_list.append(mac_host)
-        hostname_list.append(hostname)
-
-    for i in range(1, 15):  # Get signal strength for each accesspoint of this device
+        mac_to_hostname[mac_host] = hostname
+    
+    data_to_insert = []
+    current_time = datetime.now()
+    for i in range(1, 15):  # Access points
         entries_ap = acs.device_get_parameter(device_id, f"Device.WiFi.AccessPoint.{i}.AssociatedDeviceNumberOfEntries")
-        if entries_ap != 0:
-            for j in range(1, entries_ap + 1):
-                signal_strength = acs.device_get_parameter(device_id, f'Device.WiFi.AccessPoint.{i}.AssociatedDevice.{j}.SignalStrength')
-                mac_associateddevice = acs.device_get_parameter(device_id, f"Device.WiFi.AccessPoint.{i}.AssociatedDevice.{j}.MACAddress")
-                if mac_associateddevice is not None:
-                    mac_associateddevice = mac_associateddevice.lower()
-                    # Check if mac_host matches mac_associateddevice and replace with hostname
-                    if mac_associateddevice in mac_host_list:
-                        index = mac_host_list.index(mac_associateddevice)
-                        hostname = hostname_list[index]
-                    else:
-                        hostname = "Unknown"
-
-                    # Insert data into TimescaleDB
-                    query = """
-                    INSERT INTO signal_strength (time, device_id, mac_address, hostname, signal_strength)
-                    VALUES (%s, %s, %s, %s, %s)
-                    """
-                    current_time = datetime.now()
-                    execute_query(query, (current_time, str(device_id), str(mac_associateddevice), str(hostname), int(signal_strength)))
-    print(f"Signal_Strength inserted successfully for {device_id}")
+        if not entries_ap:
+            continue
+        for j in range(1, entries_ap + 1):
+            param_prefix = f"Device.WiFi.AccessPoint.{i}.AssociatedDevice.{j}"
+            signal = acs.device_get_parameter(device_id, f'{param_prefix}.SignalStrength')
+            mac = acs.device_get_parameter(device_id, f"{param_prefix}.MACAddress")
+            if mac:
+                mac = mac.lower()
+                hostname = mac_to_hostname.get(mac, "?")
+                data_to_insert.append((current_time, str(device_id), str(mac), str(hostname), int(signal)))
+    
+    if data_to_insert:
+        query = """
+        INSERT INTO signal_strength (time, device_id, mac_address, hostname, signal_strength)
+        VALUES (%s, %s, %s, %s, %s)
+        """
+        with conn.cursor() as cursor:
+            cursor.executemany(query, data_to_insert)
+            conn.commit()
+        print(f"Signal_Strength: {signal} inserted successfully for {device_id} at {datetime.now()}")
 
 def neighboring_wifi(device_id):
     acs.task_set_parameter_values(device_id, [["Device.WiFi.NeighboringWiFiDiagnostic.DiagnosticsState", "Requested"]])
     refresh_device_parameter(device_id, "Device.WiFi.NeighboringWiFiDiagnostic")
-    time.sleep(5)
+    time.sleep(2)
     entries = acs.device_get_parameter(device_id, "Device.WiFi.NeighboringWiFiDiagnostic.ResultNumberOfEntries")
+    
+    data_to_insert = []
+    current_time = datetime.now()
+    
     for i in range(1, entries + 1):
-        mac = acs.device_get_parameter(device_id, f"Device.WiFi.NeighboringWiFiDiagnostic.Result.{i}.BSSID")
-        channel = acs.device_get_parameter(device_id, f"Device.WiFi.NeighboringWiFiDiagnostic.Result.{i}.Channel")
-        frequencyband = acs.device_get_parameter(device_id, f"Device.WiFi.NeighboringWiFiDiagnostic.Result.{i}.OperatingFrequencyBand")
-        channel_bandwidth = acs.device_get_parameter(device_id, f"Device.WiFi.NeighboringWiFiDiagnostic.Result.{i}.OperatingChannelBandwidth")
-        signal_strength = acs.device_get_parameter(device_id, f"Device.WiFi.NeighboringWiFiDiagnostic.Result.{i}.SignalStrength")
-        ssid = acs.device_get_parameter(device_id, f"Device.WiFi.NeighboringWiFiDiagnostic.Result.{i}.SSID")
-        #print(f"{i}. Device: {device_id} MAC: {mac}, Channel: {channel}, Frequency Band: {frequencyband}, Channel Bandwidth: {channel_bandwidth}, Signal Strength: {signal_strength}, SSID: {ssid}")
-        # Insert data into TimescaleDB
+        params = {
+            "mac": acs.device_get_parameter(device_id, f"Device.WiFi.NeighboringWiFiDiagnostic.Result.{i}.BSSID"),
+            "channel": acs.device_get_parameter(device_id, f"Device.WiFi.NeighboringWiFiDiagnostic.Result.{i}.Channel"),
+            "frequency_band": acs.device_get_parameter(device_id, f"Device.WiFi.NeighboringWiFiDiagnostic.Result.{i}.OperatingFrequencyBand"),
+            "channel_bandwidth": acs.device_get_parameter(device_id, f"Device.WiFi.NeighboringWiFiDiagnostic.Result.{i}.OperatingChannelBandwidth"),
+            "signal_strength": acs.device_get_parameter(device_id, f"Device.WiFi.NeighboringWiFiDiagnostic.Result.{i}.SignalStrength"),
+            "ssid": acs.device_get_parameter(device_id, f"Device.WiFi.NeighboringWiFiDiagnostic.Result.{i}.SSID")
+        }
+        
+        if all(params.values()):
+            data_to_insert.append((
+                str(current_time),
+                str(device_id),
+                str(params["mac"]),
+                int(params["channel"]),
+                str(params["frequency_band"]),
+                str(params["channel_bandwidth"]),
+                str(params["ssid"]),
+                int(params["signal_strength"])
+            ))
+    
+    if data_to_insert:
         query = """
         INSERT INTO neighboring_wifi (time, device_id, mac_address, channel, frequency_band, channel_bandwidth, ssid, signal_strength)
         VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
         """
-        current_time = datetime.now()
-        execute_query(query, (current_time, str(device_id), str(mac), int(channel), str(frequencyband), str(channel_bandwidth), str(ssid), int(signal_strength)))
-    print(f"Neighboring_wifi inserted successfully for {device_id}")
-        
-def loop(device):
-    while True:
-        x = 0.5
-        y = 0.1
-        time.sleep(x)
-        signal_strength(device)
-        time.sleep(x)
-        neighboring_wifi(device)
-        time.sleep(y)
+        execute_query(query, data_to_insert)
+        print(f"Neighboring_wifi inserted successfully for {device_id} at {datetime.now()}")
 
+def loop(device):
+    z=0
+    while z<=10:
+        #signal_strength(device)
+        neighboring_wifi(device)
+        z+=1
+        print(z)
 #Main
-print(devices)
+#print(devices)
 threads = []
 for device in devices[:4]:  # Assuming you want to parallelize for the first four devices
     t = threading.Thread(target=loop, args=(device,))
@@ -373,3 +392,4 @@ for device in devices[:4]:  # Assuming you want to parallelize for the first fou
 
 for t in threads:
     t.join()
+    
