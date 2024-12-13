@@ -8,17 +8,17 @@ from datetime import datetime, timezone
 
 # Configurações do banco de dados
 DB_CONFIG = {
-    "dbname": "geolocation",
-    "user": "postgres",
-    "password": "landufrj123",
-    "host": "10.246.3.111",
+    "dbname": "",
+    "user": "",
+    "password": "",
+    "host": "",
     "port": 5432
 }
 
 # Configurações do servidor HTTP/GenieACS
 
-USERNAME = 'land'
-PASSWORD = 'landufrj123'
+USERNAME = ''
+PASSWORD = ''
 
 # Argument parser para obter o valor da porta
 parser = argparse.ArgumentParser(description='Iniciar servidor HTTP.')
