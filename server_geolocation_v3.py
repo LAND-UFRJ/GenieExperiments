@@ -31,6 +31,8 @@ def get_db_connection():
 
 class RequestHandler(BaseHTTPRequestHandler):
 
+# Servidor
+    
     def do_POST(self):
         #print("Recebida solicitação POST")
         if not self.is_authenticated():
