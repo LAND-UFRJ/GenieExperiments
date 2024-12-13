@@ -5,12 +5,6 @@
 
 import genieacs
 
-# set a device_id for the following methods
-device_id = "5091E3-EX141-2237011003026"
-
-# Create a Connection object to interact with a GenieACS server
-acs = genieacs.Connection("10.246.3.119", auth=True, user="admin", passwd="admin", port="7557")
-
 '''
 # refresh some device parameters
 acs.task_refresh_object(device_id, "InternetGatewayDevice.DeviceInfo.")
