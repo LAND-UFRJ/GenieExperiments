@@ -13,13 +13,13 @@ import threading
 from concurrent.futures import ThreadPoolExecutor
 
 # Create a Connection object to interact with a GenieACS server
-acs = genieacs.Connection(ip="10.246.3.119", auth=True, user="admin", passwd="admin", port="7557")
+acs = genieacs.Connection(ip="", auth=True, user="", passwd="", port="7557")
 # Conexão ao TimescaleDB
-conn = psycopg2.connect(dbname="testegenie", user="postgres", password="landufrj123", host="10.246.3.111", port="5432")
+conn = psycopg2.connect(dbname="", user="", password="", host="", port="5432")
 
 # set a device_id for the following methods
 devices = acs.device_get_all_IDs()  # Get all devices available
-#device_id = "98254A-Device2-223C1S5004290"
+#device_id = ""
 
 # Function to execute a query and close the cursor
 def execute_query(query, data):
