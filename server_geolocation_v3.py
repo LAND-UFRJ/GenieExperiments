@@ -8,16 +8,16 @@ from datetime import datetime, timezone
 
 # Configurações do banco de dados
 DB_CONFIG = {
-    "dbname": "geolocation",
-    "user": "postgres",
-    "password": "landufrj123",
-    "host": "10.246.3.111",
-    "port": 5432
+    "dbname": "",
+    "user": "",
+    "password": "",
+    "host": "",
+    "port": 
 }
 
 # Configurações do servidor HTTP/GenieACS
-USERNAME = 'land'
-PASSWORD = 'landufrj123'
+USERNAME = ''
+PASSWORD = ''
 
 # Argument parser para obter o valor da porta
 parser = argparse.ArgumentParser(description='Iniciar servidor HTTP.')
@@ -128,8 +128,7 @@ class RequestHandler(BaseHTTPRequestHandler):
         for table_name, table_records in records.items():
             #print(f"Inserindo dados na tabela {table_name}...")
             self.insert_into_timescale(table_name, table_records, cursor)
-
-     #------------WORKING ON THIS FUNCTION----------------#
+        
     def process_neighboring_wifi(self, item, collection_time, records):
         #print("Processando Neighboring WiFi...")
         neighboring_wifi = item.get('Device', {}).get('WiFi', {}).get('NeighboringWiFiDiagnostic', {}).get('Result', {})
@@ -179,7 +178,6 @@ class RequestHandler(BaseHTTPRequestHandler):
             print(f"Neighboring WiFi: {records}")
  
 #Inscrição dos dados no timescale
-
 
     def insert_into_timescale(self, table_name, records, cursor):
         if not records:
