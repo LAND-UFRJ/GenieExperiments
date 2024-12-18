@@ -135,7 +135,7 @@ def process_and_insert(self, data, connection):
             print(f"Erro ao processar e inserir dados: {e}")
 '''
 if __name__ == '__main__':
-    app.run(host='10.246.3.128', port=10001, debug=True)
+    app.run(host='', port=10001, debug=True)
     data = {
         'redes_proximas': []
     }
