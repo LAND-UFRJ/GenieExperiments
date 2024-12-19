@@ -2,12 +2,27 @@ from flask import Flask, request, jsonify
 from psycopg2.extras import execute_values
 from datetime import datetime, timezone
 import socket
-
+import json
 
 app = Flask(__name__)
 
+
 # Variável para armazenar os dados recebidos
 received_data = {}
+
+# Função para enviar dados para a porta 10002
+def send_data_to_redis(data):
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.connect(('10.246.3.128', 10002))  # Conecte-se ao Redis
+            # Formatar comando SET no protocolo RESP
+            redis_command = f"*3\r\n$3\r\nSET\r\n${len('key')}\r\nkey\r\n${len(json.dumps(data))}\r\n{json.dumps(data)}\r\n"
+            s.sendall(redis_command.encode('utf-8'))
+            response = s.recv(1024)
+        print(f"Resposta do Redis: {response.decode('utf-8')}")
+    except Exception as e:
+        print(f"Erro ao enviar dados para o Redis: {e}")
+
 
 # Rota para receber dados POST
 @app.route('/bulkdata', methods=['POST'])
@@ -15,7 +30,18 @@ def receive_json():
     global received_data
     received_data = request.json  # Armazena o JSON recebido
     print("JSON recebido:", received_data)
-    return jsonify({"message": "Dados recebidos com sucesso"}), 200
+
+    # Enviar os dados para a porta 10002
+    try:
+        response = send_data_to_redis(received_data)  # Chama a função de envio
+        if response:
+            print(f"Resposta do servidor na porta 10002: {response}")
+        else:
+            print("Falha ao receber resposta do servidor na porta 10002.")
+    except Exception as e:
+        print(f"Erro ao enviar dados para a porta 10002: {e}")
+
+    return jsonify({"message": "Dados recebidos e enviados com sucesso"}), 200
 
 # Rota para enviar dados via GET
 @app.route('/get_json', methods=['GET'])
@@ -25,8 +51,8 @@ def get_json():
     else:
         return jsonify({"message": "Nenhum dado disponível"}), 404
 
-
-def process_data(self, data, cursor):
+'''
+def process_data(self, received_data, cursor):
     #print("Processando dados...")
     records = {
         'redes_proximas': []
@@ -87,17 +113,8 @@ def process_neighboring_wifi(self, item, collection_time, records):
             except (ValueError, TypeError) as e:
                 print(f"Erro ao processar Neighboring WiFi para {bssid}: {e}")
     if records:
-        print(f"Neighboring WiFi: {records}")
+        print(f"Neighboring WiFi: {records}")    
 
-
-def send_data_to_port(data, port):
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-        s.connect(('localhost', port))
-        s.sendall(data.encode('utf-8'))
-        response = s.recv(1024)
-    return response.decode('utf-8')
-    
-'''
 #Inscrição dos dados no timescale
 
 def insert_into_timescale(self, table_name, records, cursor):
@@ -136,9 +153,3 @@ def process_and_insert(self, data, connection):
 '''
 if __name__ == '__main__':
     app.run(host='', port=10001, debug=True)
-    data = {
-        'redes_proximas': []
-    }
-    port = 12000
-    response = send_data_to_port(data, port)
-    print(f"Resposta do servidor: {response}")
