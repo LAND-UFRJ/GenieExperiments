@@ -1,17 +1,65 @@
-# GenieACS TimescaleDB Integration
+# GenieExperiments
 
-Este repositório contém scripts para integrar o GenieACS com TimescaleDB, criando uma base de dados robusta para armazenar e analisar dados de roteadores.
+Repositório público para o projeto de **geolocalização baseado em site survey**, utilizando dados coletados pelo GenieACS, processados via Nginx, Redis e TimescaleDB.
 
-## Visão Geral
+## Descrição
 
-Este projeto visa coletar dados de dispositivos gerenciados pelo GenieACS e armazená-los em um banco de dados TimescaleDB. Isso permite um armazenamento eficiente e uma análise temporal dos dados dos dispositivos.
+Este projeto tem como objetivo coletar, processar e armazenar dados de geolocalização obtidos a partir de uma pesquisa de site survey. O fluxo de dados é o seguinte:
 
-## Pré-requisitos
+1. **GenieACS**: Coleta dados de dispositivos via `bulkdata`.
+2. **Nginx**: Recebe os dados do GenieACS e os encaminha para um servidor HTTP.
+3. **Redis**: Armazena temporariamente os dados recebidos do servidor HTTP.
+4. **TimescaleDB**: Armazena os dados processados para análise e consulta.
 
-Antes de começar, certifique-se de ter os seguintes componentes instalados:
+Os scripts principais do repositório são responsáveis por gerenciar diferentes partes desse fluxo.
 
-- Python 3.x
-- GenieACS
-- PostgreSQL com extensão TimescaleDB
-- Bibliotecas Python: `psycopg2`, `json`
+## Estrutura do Repositório
 
+- **README.md**: Este arquivo, contendo informações sobre o repositório e o projeto.
+- **background.env**: Arquivo de configuração de ambiente para o script `background.py`.
+- **background.py**: Atualiza o GenieACS na árvore `neighbouring_wifi` para coletar dados de dispositivos vizinhos.
+- **genieacs.py**: Ativa o serviço da API do GenieACS para coleta de dados.
+- **process_data.env**: Arquivo de configuração de ambiente para o script `process_data.py`.
+- **process_data.py**: Recebe os dados do servidor HTTP e os envia para o Redis.
+- **redis_to_timescale.env**: Arquivo de configuração de ambiente para o script `redis_to_timescale.py`.
+- **redis_to_timescale.py**: Transfere os dados do Redis para o TimescaleDB para armazenamento e análise.
+- **example.py**: Exemplo de código para referência e testes.
+
+## Fluxo de Dados
+
+1. **Coleta de Dados**:
+   - O `genieacs.py` ativa a API do GenieACS para coletar dados de dispositivos via `bulkdata`.
+   - O `background.py` atualiza a árvore `neighbouring_wifi` no GenieACS para garantir que os dados de dispositivos vizinhos sejam coletados.
+
+2. **Recebimento e Processamento**:
+   - Os dados coletados são enviados para um servidor HTTP via Nginx.
+   - O `process_data.py` recebe os dados do servidor HTTP e os envia para o Redis.
+
+3. **Armazenamento**:
+   - O `redis_to_timescale.py` transfere os dados do Redis para o TimescaleDB, onde são armazenados para análise e consulta.
+
+## Bibliotecas Utilizadas
+
+O projeto utiliza as seguintes bibliotecas Python:
+
+- **genieacs**: Para interagir com a API do GenieACS.
+- **time**: Para manipulação de tempo e delays.
+- **concurrent.futures**: Para execução concorrente usando `ThreadPoolExecutor`.
+- **os**: Para interagir com o sistema operacional e variáveis de ambiente.
+- **dotenv**: Para carregar variáveis de ambiente a partir de arquivos `.env`.
+- **requests**: Para fazer requisições HTTP.
+- **json**: Para manipulação de dados no formato JSON.
+- **fastapi**: Para criar o servidor HTTP que recebe os dados.
+- **pydantic**: Para validação de dados e criação de modelos.
+- **datetime**: Para manipulação de datas e horários.
+- **redis**: Para interagir com o Redis.
+- **uvicorn**: Para rodar o servidor HTTP baseado no FastAPI.
+- **logging**: Para registro de logs.
+- **psycopg2**: Para interagir com o TimescaleDB (baseado em PostgreSQL).
+
+## Como Usar
+
+1. Clone o repositório:
+
+   ```bash
+   git clone https://github.com/LAND-UFR/GenieExperiments.git
