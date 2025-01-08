@@ -1,6 +1,6 @@
 # GenieExperiments
 
-Repositório público para o projeto de **geolocalização baseado em site survey**, utilizando dados coletados pelo GenieACS, processados via Nginx, Redis e TimescaleDB.
+Repositório do laboratório de computação LAND da COPPE/UFRJ para o projeto de **geolocalização baseado em site survey**, utilizando dados coletados pelo GenieACS, processados via Nginx, Redis e TimescaleDB.
 
 ## Descrição
 
