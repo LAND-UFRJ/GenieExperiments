@@ -16,12 +16,9 @@ Os scripts principais do repositório são responsáveis por gerenciar diferente
 ## Estrutura do Repositório
 
 - **README.md**: Este arquivo, contendo informações sobre o repositório e o projeto.
-- **background.env**: Arquivo de configuração de ambiente para o script `background.py`.
 - **background.py**: Atualiza o GenieACS na árvore `neighbouring_wifi` para coletar dados de dispositivos vizinhos.
 - **genieacs.py**: Ativa o serviço da API do GenieACS para coleta de dados.
-- **process_data.env**: Arquivo de configuração de ambiente para o script `process_data.py`.
 - **process_data.py**: Recebe os dados do servidor HTTP e os envia para o Redis.
-- **redis_to_timescale.env**: Arquivo de configuração de ambiente para o script `redis_to_timescale.py`.
 - **redis_to_timescale.py**: Transfere os dados do Redis para o TimescaleDB para armazenamento e análise.
 - **example.py**: Exemplo de código para referência e testes.
 
