@@ -6,17 +6,18 @@ import os
 from dotenv import load_dotenv
 
 # Carregar variáveis de ambiente do arquivo .env
-load_dotenv(dotenv_path='Land/redis_to_timescale.env')
+load_dotenv(dotenv_path='')
 
 # Configurações do Redis
 REDIS_HOST = os.getenv('REDIS_HOST')
 REDIS_PORT = int(os.getenv('REDIS_PORT'))
-REDIS_PREFIXES = ['testtable;', 'redes_proximas;']  # Prefixos das chaves do Redis
+REDIS_PREFIXES = ['testtable;', 'redes_proximas;', 'wifistats;', 'interface_lan;', 'interface_wan;']  # Prefixos das chaves do Redis
 
 # Configurações do TimescaleDB
 PG_HOST = os.getenv('PG_HOST')
 PG_PORT = int(os.getenv('PG_PORT'))
-PG_DATABASE = os.getenv('PG_DATABASE')
+PG_DB_geo = os.getenv('PG_DB_geo')
+PG_DB_bulk = os.getenv('PG_DB_bulk')
 PG_USER = os.getenv('PG_USER')
 PG_PASSWORD = os.getenv('PG_PASSWORD')
 
@@ -33,15 +34,28 @@ print("Memória do Redis limpa.")
 # Conectar ao TimescaleDB
 def connect_to_timescale():
     try:
-        connection = psycopg2.connect(
+        # Conexão ao primeiro banco de dados
+        connection_geo = psycopg2.connect(
             host=PG_HOST,
             port=PG_PORT,
-            dbname=PG_DATABASE,
+            dbname=PG_DB_geo, 
             user=PG_USER,
             password=PG_PASSWORD
         )
-        print("Conexão com TimescaleDB bem-sucedida.")
-        return connection
+        print("Conexão com TimescaleDB (geo) bem-sucedida.")
+
+        # Conexão ao segundo banco de dados
+        connection_bulkdata = psycopg2.connect(
+            host=PG_HOST,
+            port=PG_PORT,
+            dbname=PG_DB_bulk, 
+            user=PG_USER,
+            password=PG_PASSWORD
+        )
+        print("Conexão com TimescaleDB (bulkdata) bem-sucedida.")
+
+        # Retornar ambas as conexões
+        return connection_geo, connection_bulkdata
     except Exception as e:
         print(f"Erro ao conectar ao TimescaleDB: {e}")
         raise
@@ -82,8 +96,24 @@ def insert_wifi_data(connection, time, device_id, mac_address, hostname, signal_
     data = (time, device_id, mac_address, hostname, signal_strength, packets_sent, packets_received, bytes_sent, bytes_received)
     insert_data_into_timescale(connection, query, data)
 
+def insert_interface_lan(connection, time, device_id, lan_packets_received, lan_bytes_received, lan_bytes_per_packets_received, lan_packets_sent, lan_bytes_sent, lan_bytes_per_packets_sent, lan_errors_sent, lan_errors_received):
+    query = sql.SQL("""
+        INSERT INTO interface_lan (time, device_id, lan_packets_received, lan_bytes_received, lan_bytes_per_packets_received, lan_packets_sent, lan_bytes_sent, lan_bytes_per_packets_sent, lan_errors_sent, lan_errors_received)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+    """)
+    data = (time, device_id, lan_packets_received, lan_bytes_received, lan_bytes_per_packets_received, lan_packets_sent, lan_bytes_sent, lan_bytes_per_packets_sent, lan_errors_sent, lan_errors_received)
+    insert_data_into_timescale(connection, query, data)
+
+def insert_interface_wan(connection, time, device_id, wan_packets_received, wan_bytes_received, wan_bytes_per_packets_received, wan_packets_sent, wan_bytes_sent, wan_bytes_per_packets_sent, wan_errors_sent, wan_errors_received):
+    query = sql.SQL("""
+        INSERT INTO interface_wan (time, device_id, wan_packets_received, wan_bytes_received, wan_bytes_per_packets_received, wan_packets_sent, wan_bytes_sent, wan_bytes_per_packets_sent, wan_errors_sent, wan_errors_received)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+    """)
+    data = (time, device_id, wan_packets_received, wan_bytes_received, wan_bytes_per_packets_received, wan_packets_sent, wan_bytes_sent, wan_bytes_per_packets_sent, wan_errors_sent, wan_errors_received)
+    insert_data_into_timescale(connection, query, data)
+
 # Transferir dados do Redis para o TimescaleDB
-def process_redis_keys(connection, processed_keys):
+def process_redis_keys(connection_geo, connection_bulkdata, processed_keys):
     for prefix in REDIS_PREFIXES:
         keys = redis_client.keys(f"{prefix}*")
         print(f"Chaves encontradas no Redis com prefixo {prefix}: {keys}")
@@ -95,13 +125,19 @@ def process_redis_keys(connection, processed_keys):
             try:
                 if prefix == 'testtable;':
                     _, device_id, uptime = key.split(";")
-                    insert_device_data(connection, device_id, uptime)
+                    insert_device_data(connection_geo, device_id, uptime)
                 elif prefix == 'redes_proximas;':
                     _, detected_at, device_id, bssid_router, bssid_rede, signal_strength, ssid_rede, channel, channel_bandwidth = key.split(";")
-                    insert_redes_proximas_data(connection, detected_at, device_id, bssid_router, bssid_rede, signal_strength, ssid_rede, channel, channel_bandwidth)
+                    insert_redes_proximas_data(connection_geo, detected_at, device_id, bssid_router, bssid_rede, signal_strength, ssid_rede, channel, channel_bandwidth)
                 elif prefix == 'wifistats;':
                     _, time, device_id, mac_address, hostname, signal_strength, packets_sent, packets_received = key.split(";")
-                    insert_wifi_data(connection, time, device_id, mac_address, hostname, signal_strength, packets_sent, packets_received)
+                    insert_wifi_data(connection_bulkdata, time, device_id, mac_address, hostname, signal_strength, packets_sent, packets_received)
+                elif prefix == 'interface_wan;':
+                    _, time, device_id, wan_packets_received, wan_bytes_received, wan_bytes_per_packets_received, wan_packets_sent, wan_bytes_sent, wan_bytes_per_packets_sent, wan_errors_sent, wan_errors_received = key.split(";")
+                    insert_interface_wan(connection_bulkdata, time, device_id, wan_packets_received, wan_bytes_received, wan_bytes_per_packets_received, wan_packets_sent, wan_bytes_sent, wan_bytes_per_packets_sent, wan_errors_sent, wan_errors_received)
+                elif prefix == 'interface_lan;':
+                    _, time, device_id, lan_packets_received, lan_bytes_received, lan_bytes_per_packets_received, lan_packets_sent, lan_bytes_sent, lan_bytes_per_packets_sent, lan_errors_sent, lan_errors_received = key.split(";")
+                    insert_interface_lan(connection_bulkdata, time, device_id, lan_packets_received, lan_bytes_received, lan_bytes_per_packets_received, lan_packets_sent, lan_bytes_sent, lan_bytes_per_packets_sent, lan_errors_sent, lan_errors_received)
                              
                 processed_keys.add(key)  # Marcar a chave como processada
             except ValueError as e:
@@ -111,17 +147,22 @@ def process_redis_keys(connection, processed_keys):
 
 # Função principal
 def main():
-    connection = connect_to_timescale()
-    processed_keys = set()  # Rastrear chaves já processadas
-    
     try:
+        connection_geo, connection_bulkdata = connect_to_timescale()
+        processed_keys = set()  # Rastrear chaves já processadas
+        
         while True:
-            process_redis_keys(connection, processed_keys)
+            process_redis_keys(connection_geo, connection_bulkdata, processed_keys)
             time.sleep(5)  # Aguardar 5 segundos antes de verificar novamente
     except KeyboardInterrupt:
         print("Encerrando o programa.")
+    except Exception as e:
+        print(f"Erro no programa principal: {e}")
     finally:
-        connection.close()
+        if 'connection_geo' in locals() and connection_geo:
+            connection_geo.close()
+        if 'connection_bulkdata' in locals() and connection_bulkdata:
+            connection_bulkdata.close()
 
 if __name__ == "__main__":
     main()

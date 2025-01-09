@@ -10,7 +10,7 @@ import os
 from dotenv import load_dotenv
 
 # Configurações iniciais
-load_dotenv(dotenv_path='Land/process_data.env')
+load_dotenv(dotenv_path='')
 
 app = FastAPI()
 logging.basicConfig(level=logging.INFO)
@@ -65,15 +65,19 @@ async def receive_bulkdata(request: Request):
         print(f"Dados recebidos: {body}")
         data = BulkData(**body)  # Validação automática via Pydantic
         
-        nbw_records, testtable_records, wifistats_records = process_data(data)
+        nbw_records, testtable_records, wifistats_records, interface_wan_records, interface_lan_records = process_data(data)
+        
         print(f"Registros WiFi processados: {nbw_records}")
         print(f"Registros TestTable processados: {testtable_records}")
         print(f"Registros WiFi Stats processados: {wifistats_records}")
+        print(f"Registros Interface WAN processados: {interface_wan_records}")
+        print(f"Registros Interface LAN processados: {interface_lan_records}")
         
         store_data_in_redis(nbw_records, "redes_proximas", "redes_proximas_stream", ["detected_at", "device_id", "bssid_router", "bssid_rede", "signal_strength", "ssid_rede", "channel", "channel_bandwidth"])
         store_data_in_redis(testtable_records, "testtable", "testtable_stream", ["device_id", "uptime"])
         store_data_in_redis(wifistats_records, "wifidata", "wifidata_stream", ["detected_at", "device_id", "mac_address_ap", "hostname", "signal_strength", "packets_sent", "packets_received"])
-
+        store_data_in_redis(interface_wan_records, "interface_wan", "interface_wan_stream", ["time", "device_id", "wan_packets_received", "wan_bytes_received", "wan_bytes_per_packets_received", "wan_packets_sent", "wan_bytes_sent", "wan_bytes_per_packets_sent", "wan_errors_sent", "wan_errors_received"])
+        store_data_in_redis(interface_lan_records, "interface_lan", "interface_lan_stream", ["time", "device_id", "lan_packets_received", "lan_bytes_received", "lan_bytes_per_packets_received", "lan_packets_sent", "lan_bytes_sent", "lan_bytes_per_packets_sent", "lan_errors_sent", "lan_errors_received"])
         return {"message": "Dados processados e enviados ao Redis com sucesso."}
 
     except ValidationError as e:
@@ -93,10 +97,16 @@ def process_data(data: BulkData) -> Tuple[List[Dict[str, Any]], List[Dict[str, A
     Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]
     """
     nbw_records = []
-    testtable_records = []  # Lista separada para testtable
+    testtable_records = []
     wifistats_records = []
+    interface_wan_records = []
+    interface_lan_records = []
 
     for item in data.Report:
+        if not isinstance(item.Device, dict):
+            print(f"Erro: item.Device não é um dicionário: {item.Device}")
+            continue
+        
         collection_time = datetime.fromtimestamp(item.CollectionTime, timezone.utc)
         device_id = safe_get(item.Device, ["ManagementServer", "ConnectionRequestUsername"], "unknown")
         
@@ -113,7 +123,15 @@ def process_data(data: BulkData) -> Tuple[List[Dict[str, Any]], List[Dict[str, A
         wifi_stats_results = process_wifi_stats(item, collection_time, device_id, [])
         wifistats_records.extend(wifi_stats_results)
 
-    return nbw_records, testtable_records, wifistats_records
+        # Processa dados das interfaces WAN
+        interface_wan_results = interface_wan(item, collection_time, device_id, [])
+        interface_wan_records.extend(interface_wan_results)
+
+        # Processa dados das interfaces LAN
+        interface_lan_results = interface_lan(item, collection_time, device_id, [])
+        interface_lan_records.extend(interface_lan_results)
+
+    return nbw_records, testtable_records, wifistats_records, interface_wan_records, interface_lan_records
 
 def process_test_data(device_id: str, item: DeviceData):
     try:
@@ -203,77 +221,89 @@ def process_wifi_stats(item, collection_time, device_id, records):
                 print("AssociatedDevice não é um dicionário:", associateddevice)
     return records
 
-def interfaces_wan_lan(item:DeviceData, collection_time: datetime, device_id, records: List[Dict[str, Any]]): # tem que Fazer a função e configurar o bulkdata. Timescale já está pronto
-    interface_wan = item.Device.get('Device', {}).get('IP', {}).get('Interface', 1)
-    interface_lan = item.Device.get('Device', {}).get('IP', {}).get('Interface', 4)
+def interface_wan(item: DeviceData, collection_time: datetime, device_id, records: List[Dict[str, Any]]):
+    interface_wan = item.Device.get('IP', {}).get('Interface', {}).get('1', {})
+    print(f"interface_wan: {interface_wan}")
+    print(f"interface_wan type: {type(interface_wan)}")
+    print(f"items: {interface_wan.items()}")
+    print(f"values: {interface_wan.values()}")
 
     if not isinstance(interface_wan, dict):  # Verifica se interface_wan é um dicionário
         print(f"Interface WAN is not a dictionary: {interface_wan}")
         return records
-    
-    if not isinstance(interface_lan, dict): # Verifica se interface_lan é um dicionário
-        print(f"Interface LAN is not a dictionary: {interface_lan}")
-        return records
-    
-    for details in interface_wan.items():
+
+    for details in interface_wan.values():  # Itera sobre os valores do dicionário
         try:
-            bytes_received_wan = int(details.get('Stats', {}).get('BytesReceived', -1))
-            bytes_sent_wan = int(details.get('Stats', {}).get('BytesSent', -1))
-            packets_received_wan = int(details.get('Stats', {}).get('PacketsReceived', -1))
-            packets_sent_wan = int(details.get('Stats', {}).get('PacketsSent', -1))
-            errors_received_wan = int(details.get('Stats', {}).get('ErrorsReceived', -1))
-            errors_sent_wan = int(details.get('Stats', {}).get('ErrorsSent', -1))
+            bytes_received_wan = int(details.get('BytesReceived', -1))
+            bytes_sent_wan = int(details.get('BytesSent', -1))
+            packets_received_wan = int(details.get('PacketsReceived', -1))
+            packets_sent_wan = int(details.get('PacketsSent', -1))
+            errors_received_wan = int(details.get('ErrorsReceived', -1))
+            errors_sent_wan = int(details.get('ErrorsSent', -1))
             record = {
                 "time": collection_time.astimezone(timezone(timedelta(hours=-3))).isoformat(),  # Convertendo para o fuso horário brasileiro
                 "device_id": device_id,
-                "bytes_received_wan": bytes_received_wan,
-                "bytes_sent_wan": bytes_sent_wan,
-                "packets_received_wan": packets_received_wan,
-                "packets_sent_wan": packets_sent_wan,
-                "errors_received_wan": errors_received_wan,
-                "errors_sent_wan": errors_sent_wan
+                "wan_packets_received": packets_received_wan,
+                "wan_bytes_received": bytes_received_wan,
+                "wan_bytes_per_packets_received": bytes_received_wan / packets_received_wan if packets_received_wan > 0 else None,
+                "wan_packets_sent": packets_sent_wan,
+                "wan_bytes_sent": bytes_sent_wan,
+                "wan_bytes_per_packets_sent": bytes_sent_wan / packets_sent_wan if packets_sent_wan > 0 else None,
+                "wan_errors_sent": errors_sent_wan,
+                "wan_errors_received": errors_received_wan
             }
             records.append(record)
             print(f"Interface WAN Processada: {record}")
         except (ValueError, TypeError) as e:
             print(f"Erro ao processar Interface WAN do dispositivo {device_id}: {e}")
+    return records
 
-    for details in interface_lan.items():
+def interface_lan(item: DeviceData, collection_time: datetime, device_id, records: List[Dict[str, Any]]):
+    interface_lan = item.Device.get('IP', {}).get('Interface', {}).get('4', {})
+    print(f"interface_lan: {interface_lan}")
+    print(f"interface_lan type: {type(interface_lan)}")
+
+    if not isinstance(interface_lan, dict):  # Verifica se interface_lan é um dicionário
+        print(f"Interface LAN is not a dictionary: {interface_lan}")
+        return records
+
+    for details in interface_lan.values():  # Itera sobre as tuplas (chave, valor)
         try:
-            bytes_received_lan = int(details.get('Stats', {}).get('BytesReceived', -1))
-            bytes_sent_lan = int(details.get('Stats', {}).get('BytesSent', -1))
-            packets_received_lan = int(details.get('Stats', {}).get('PacketsReceived', -1))
-            packets_sent_lan = int(details.get('Stats', {}).get('PacketsSent', -1))
-            errors_received_lan = int(details.get('Stats', {}).get('ErrorsReceived', -1))
-            errors_sent_lan = int(details.get('Stats', {}).get('ErrorsSent', -1))
+            bytes_received_lan = int(details.get('BytesReceived', -1))
+            bytes_sent_lan = int(details.get('BytesSent', -1))
+            packets_received_lan = int(details.get('PacketsReceived', -1))
+            packets_sent_lan = int(details.get('PacketsSent', -1))
+            errors_received_lan = int(details.get('ErrorsReceived', -1))
+            errors_sent_lan = int(details.get('ErrorsSent', -1))
             record = {
                 "time": collection_time.astimezone(timezone(timedelta(hours=-3))).isoformat(),  # Convertendo para o fuso horário brasileiro
                 "device_id": device_id,
-                "bytes_received_lan": bytes_received_lan,
-                "bytes_sent_lan": bytes_sent_lan,
-                "packets_received_lan": packets_received_lan,
-                "packets_sent_lan": packets_sent_lan,
-                "errors_received_lan": errors_received_lan,
-                "errors_sent_lan": errors_sent_lan
+                "lan_packets_received": packets_received_lan,
+                "lan_bytes_received": bytes_received_lan,
+                "lan_bytes_per_packets_received": bytes_received_lan / packets_received_lan if packets_received_lan > 0 else None,
+                "lan_packets_sent": packets_sent_lan,
+                "lan_bytes_sent": bytes_sent_lan,
+                "lan_bytes_per_packets_sent": bytes_sent_lan / packets_sent_lan if packets_sent_lan > 0 else None,
+                "lan_errors_sent": errors_sent_lan,
+                "lan_errors_received": errors_received_lan
             }
             records.append(record)
             print(f"Interface LAN Processada: {record}")
         except (ValueError, TypeError) as e:
             print(f"Erro ao processar Interface LAN do dispositivo {device_id}: {e}")
     return records
-    
-    
 
 def store_data_in_redis(records: List[Dict[str, Any]], redis_key_prefix: str, redis_stream: str, key_fields: List[str]):
     for record in records:
         try:
-            redis_key = f"{redis_key_prefix};{';'.join(str(record.get(field, 'missing')) for field in key_fields)}"
+            # Converte valores None para string 'null' antes de armazenar
+            record = {key: (str(value) if value is not None else '-1') for key, value in record.items()}
+            redis_key = f"{redis_key_prefix};{';'.join(record.get(field, 'missing') for field in key_fields)}"
             print(f"Armazenando no Redis com chave: {redis_key} e dados: {record}")
             redis_client.hset(redis_key, mapping=record)
             redis_client.xadd(redis_stream, record)
         except Exception as e:
             print(f"Erro ao armazenar registro no Redis: {e}")
-
 
 if __name__ == "__main__":
     uvicorn.run(app, host=os.getenv('UVICORN_HOST'), port=int(os.getenv('UVICORN_PORT')))
