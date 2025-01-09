@@ -6,7 +6,7 @@ import os
 from dotenv import load_dotenv
 
 # Carregar variáveis de ambiente do arquivo .env
-load_dotenv(dotenv_path='/home/localuser/codes/redis_to_timescale.env')
+load_dotenv(dotenv_path='')
 
 # Configurações do Redis
 REDIS_HOST = os.getenv('REDIS_HOST')
