@@ -10,7 +10,7 @@ import os
 from dotenv import load_dotenv
 
 # Configurações iniciais
-load_dotenv(dotenv_path='/home/localuser/codes/process_data.env')
+load_dotenv(dotenv_path='')
 
 app = FastAPI()
 logging.basicConfig(level=logging.INFO)
