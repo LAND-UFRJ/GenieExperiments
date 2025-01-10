@@ -57,5 +57,6 @@ choice = int(input("Select the device by its number: ")) - 1
 selected_device = devices[choice]
 print(f"Selected device: {selected_device}")
 
+#testando...
 config_profile(selected_device, "2", "teste do código", "teste1", "passwordteste1", "usertest1", "1000")
 
