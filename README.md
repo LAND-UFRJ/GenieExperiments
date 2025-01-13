@@ -1,6 +1,6 @@
 # GenieExperiments
 
-Repositório do laboratório de computação LAND da COPPE/UFRJ para o projeto de **geolocalização baseado em site survey**, utilizando dados coletados pelo GenieACS, processados via Nginx, Redis e TimescaleDB.
+Repositório do laboratório de computação LAND da COPPE/UFRJ para o projeto de **geolocalização baseada em site survey**, utilizando dados coletados pelo GenieACS, processados via Nginx, Redis e TimescaleDB.
 
 ## Descrição
 
@@ -21,12 +21,14 @@ Os scripts principais do repositório são responsáveis por gerenciar diferente
 - **process_data.py**: Recebe os dados do servidor HTTP e os envia para o Redis.
 - **redis_to_timescale.py**: Transfere os dados do Redis para o TimescaleDB para armazenamento e análise.
 - **example.py**: Exemplo de código para referência e testes.
+- **create_bulkdata.py**: Automatiza a configuração do `bulkdata` para novas CPEs conectadas ao GenieACS.
 
 ## Fluxo de Dados
 
 1. **Coleta de Dados**:
    - O `genieacs.py` ativa a API do GenieACS para coletar dados de dispositivos via `bulkdata`.
    - O `background.py` atualiza a árvore `neighbouring_wifi` no GenieACS para garantir que os dados de dispositivos vizinhos sejam coletados.
+   - O `create_bulkdata.py` configura automaticamente o `bulkdata` para novas CPEs conectadas ao GenieACS.
 
 2. **Recebimento e Processamento**:
    - Os dados coletados são enviados para um servidor HTTP via Nginx.
