@@ -11,6 +11,7 @@ from dotenv import load_dotenv
 
 # Configurações iniciais
 load_dotenv(dotenv_path='')
+load_dotenv(dotenv_path='')
 
 app = FastAPI()
 logging.basicConfig(level=logging.INFO)
@@ -67,7 +68,7 @@ async def receive_bulkdata(request: Request):
         
         nbw_records, testtable_records, wifistats_records, interface_wan_records, interface_lan_records = process_data(data)
         
-        print(f"Registros WiFi processados: {nbw_records}")
+        print(f"Registros WiFi_NBW processados: {nbw_records}")
         print(f"Registros TestTable processados: {testtable_records}")
         print(f"Registros WiFi Stats processados: {wifistats_records}")
         print(f"Registros Interface WAN processados: {interface_wan_records}")
@@ -75,7 +76,7 @@ async def receive_bulkdata(request: Request):
         
         store_data_in_redis(nbw_records, "redes_proximas", "redes_proximas_stream", ["detected_at", "device_id", "bssid_router", "bssid_rede", "signal_strength", "ssid_rede", "channel", "channel_bandwidth"])
         store_data_in_redis(testtable_records, "testtable", "testtable_stream", ["device_id", "uptime"])
-        store_data_in_redis(wifistats_records, "wifidata", "wifidata_stream", ["detected_at", "device_id", "mac_address_ap", "hostname", "signal_strength", "packets_sent", "packets_received"])
+        store_data_in_redis(wifistats_records, "wifistats", "wifistats_stream", ["time", "device_id", "mac_address", "hostname", "signal_strength", "packets_sent", "packets_received"])
         store_data_in_redis(interface_wan_records, "interface_wan", "interface_wan_stream", ["time", "device_id", "wan_packets_received", "wan_bytes_received", "wan_bytes_per_packets_received", "wan_packets_sent", "wan_bytes_sent", "wan_bytes_per_packets_sent", "wan_errors_sent", "wan_errors_received"])
         store_data_in_redis(interface_lan_records, "interface_lan", "interface_lan_stream", ["time", "device_id", "lan_packets_received", "lan_bytes_received", "lan_bytes_per_packets_received", "lan_packets_sent", "lan_bytes_sent", "lan_bytes_per_packets_sent", "lan_errors_sent", "lan_errors_received"])
         return {"message": "Dados processados e enviados ao Redis com sucesso."}
@@ -186,11 +187,13 @@ def process_neighboring_wifi(item: DeviceData, collection_time: datetime, device
     return records
 
 def process_wifi_stats(item, collection_time, device_id, records):
-    host_data = item.Device.get('Device', {}).get('Hosts', {}).get('Host', {})
+    host_data = item.Device.get('Hosts', {}).get('Host', {})
+    print(f"host_data: {host_data}")
     if not isinstance(host_data, dict):  # Verifica se host_data é um dicionário
         host_data = {}
 
-    accesspoint_data = item.Device.get('Device', {}).get('WiFi', {}).get('AccessPoint', {})
+    accesspoint_data = item.Device.get('WiFi', {}).get('AccessPoint', {})
+    print(f"accesspoint_data: {accesspoint_data}")
     if not isinstance(accesspoint_data, dict):  # Verifica se accesspoint_data é um dicionário
         accesspoint_data = {}
 
@@ -223,11 +226,6 @@ def process_wifi_stats(item, collection_time, device_id, records):
 
 def interface_wan(item: DeviceData, collection_time: datetime, device_id, records: List[Dict[str, Any]]):
     interface_wan = item.Device.get('IP', {}).get('Interface', {}).get('1', {})
-    print(f"interface_wan: {interface_wan}")
-    print(f"interface_wan type: {type(interface_wan)}")
-    print(f"items: {interface_wan.items()}")
-    print(f"values: {interface_wan.values()}")
-
     if not isinstance(interface_wan, dict):  # Verifica se interface_wan é um dicionário
         print(f"Interface WAN is not a dictionary: {interface_wan}")
         return records
@@ -260,8 +258,6 @@ def interface_wan(item: DeviceData, collection_time: datetime, device_id, record
 
 def interface_lan(item: DeviceData, collection_time: datetime, device_id, records: List[Dict[str, Any]]):
     interface_lan = item.Device.get('IP', {}).get('Interface', {}).get('4', {})
-    print(f"interface_lan: {interface_lan}")
-    print(f"interface_lan type: {type(interface_lan)}")
 
     if not isinstance(interface_lan, dict):  # Verifica se interface_lan é um dicionário
         print(f"Interface LAN is not a dictionary: {interface_lan}")
