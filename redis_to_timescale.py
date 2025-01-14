@@ -7,6 +7,7 @@ from dotenv import load_dotenv
 
 # Carregar variáveis de ambiente do arquivo .env
 load_dotenv(dotenv_path='')
+load_dotenv(dotenv_path='')
 
 # Configurações do Redis
 REDIS_HOST = os.getenv('REDIS_HOST')
@@ -88,12 +89,12 @@ def insert_redes_proximas_data(connection, detected_at, device_id, bssid_router,
     data = (detected_at, device_id, bssid_router, bssid_rede, signal_strength, ssid_rede, channel, channel_bandwidth)
     insert_data_into_timescale(connection, query, data)
 
-def insert_wifi_data(connection, time, device_id, mac_address, hostname, signal_strength, packets_sent, packets_received, bytes_sent, bytes_received):
+def insert_wifi_data(connection, time, device_id, mac_address, hostname, signal_strength, packets_sent, packets_received):
     query = sql.SQL("""
         INSERT INTO wifi_stats (time, device_id, mac_address, hostname, signal_strength, packets_sent, packets_received)
         VALUES (%s, %s, %s, %s, %s, %s, %s)
     """)
-    data = (time, device_id, mac_address, hostname, signal_strength, packets_sent, packets_received, bytes_sent, bytes_received)
+    data = (time, device_id, mac_address, hostname, signal_strength, packets_sent, packets_received)
     insert_data_into_timescale(connection, query, data)
 
 def insert_interface_lan(connection, time, device_id, lan_packets_received, lan_bytes_received, lan_bytes_per_packets_received, lan_packets_sent, lan_bytes_sent, lan_bytes_per_packets_sent, lan_errors_sent, lan_errors_received):
