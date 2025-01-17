@@ -86,74 +86,18 @@ def config_profile(device, profile, alias, name, username, password, interval, i
 
     print(f"Configurando BulkData no dispositivo {device}")
     #print(bulkdata_config)
-    
+    #print(type(bulkdata_config))
+    formatted_list = [[item['name_path'], item['name_value']] for item in bulkdata_config]
+
     # Iterate directly over bulkdata_config
-    for parameter in bulkdata_config:
+    for parameter in formatted_list:
         # Pass the parameter as a list containing one list
         acs.task_set_parameter_values(device, [parameter])
         print(f"Sucesso! {parameter[0]} configurado no profile {profile} do dispositivo {device}.")
     
     print(f"Sucesso! BulkData configurado no profile {profile} do dispositivo {device}.")
-
-def interfaces_wan_lan(device, profile, i):
-
-    parameter_set = [
-        {
-            'name_path': f"Device.BulkData.Profile.{profile}.Parameter.{i}.Name",
-            'name_value': "UpTime",
-            'reference_path': f"Device.BulkData.Profile.{profile}.Parameter.{i}.Reference",
-            'reference_value': "Device.DeviceInfo.UpTime"
-        },
-        {
-            'name_path': f"Device.BulkData.Profile.{profile}.Parameter.{i + 1}.Name",
-            'name_value': "Device_ID",
-            'reference_path': f"Device.BulkData.Profile.{profile}.Parameter.{i + 1}.Reference",
-            'reference_value': "Device.ManagementServer.ConnectionRequestUsername"
-        },
-        {
-            'name_path': f"Device.BulkData.Profile.{profile}.Parameter.{i + 2}.Name",
-            'name_value': "Bytes Received WAN/LAN",
-            'reference_path': f"Device.BulkData.Profile.{profile}.Parameter.{i + 2}.Reference",
-            'reference_value': "Device.IP.Interface.*.Stats.BytesReceived"
-        },
-        {
-            'name_path': f"Device.BulkData.Profile.{profile}.Parameter.{i + 3}.Name",
-            'name_value': "Bytes Sent WAN/LAN",
-            'reference_path': f"Device.BulkData.Profile.{profile}.Parameter.{i + 3}.Reference",
-            'reference_value': "Device.IP.Interface.*.Stats.BytesSent"
-        },
-        {
-            'name_path': f"Device.BulkData.Profile.{profile}.Parameter.{i + 4}.Name",
-            'name_value': "Packets Received WAN/LAN",
-            'reference_path': f"Device.BulkData.Profile.{profile}.Parameter.{i + 4}.Reference",
-            'reference_value': "Device.IP.Interface.*.Stats.PacketsReceived"
-        },
-        {
-            'name_path': f"Device.BulkData.Profile.{profile}.Parameter.{i + 5}.Name",
-            'name_value': "Packets Sent WAN/LAN",
-            'reference_path': f"Device.BulkData.Profile.{profile}.Parameter.{i + 5}.Reference",
-            'reference_value': "Device.IP.Interface.*.Stats.PacketsSent"
-        },
-        {
-            'name_path': f"Device.BulkData.Profile.{profile}.Parameter.{i + 6}.Name",
-            'name_value': "Errors Received WAN/LAN",
-            'reference_path': f"Device.BulkData.Profile.{profile}.Parameter.{i + 6}.Reference",
-            'reference_value': "Device.IP.Interface.*.Stats.ErrorsReceived"
-        },
-        {
-            'name_path': f"Device.BulkData.Profile.{profile}.Parameter.{i + 7}.Name",
-            'name_value': "Errors Sent WAN/LAN",
-            'reference_path': f"Device.BulkData.Profile.{profile}.Parameter.{i + 7}.Reference",
-            'reference_value': "Device.IP.Interface.*.Stats.ErrorsSent"
-        }
-    ]
-    unique_parameters = avoid_duplicate_parameters(device, profile, parameter_set)
-    #print(f'Unique parameters: {unique_parameters}')
-    for parameter in unique_parameters:
-        acs.task_set_parameter_values(device, [parameter])
-        print(f"Sucesso! {parameter[0]} configurado no profile {profile} do dispositivo {device}.")
-
-def wifi_stats(device, profile, i):
+  
+def dispositivos_conectados(device, profile, i):
     parameter_set = [
         {
             'name_path': f"Device.BulkData.Profile.{profile}.Parameter.{i}.Name",
@@ -163,7 +107,7 @@ def wifi_stats(device, profile, i):
         },
         {
             'name_path': f"Device.BulkData.Profile.{profile}.Parameter.{i + 1}.Name",
-            'name_value': "Mac_WiFi",
+            'name_value': "Mac_AD_WiFi",
             'reference_path': f"Device.BulkData.Profile.{profile}.Parameter.{i + 1}.Reference",
             'reference_value': "Device.WiFi.AccessPoint.*.AssociatedDevice.*.MACAddress"
         },
@@ -199,20 +143,8 @@ def wifi_stats(device, profile, i):
         },
         {
             'name_path': f"Device.BulkData.Profile.{profile}.Parameter.{i + 7}.Name",
-            'name_value': "Bytes_Sent",
-            'reference_path': f"Device.BulkData.Profile.{profile}.Parameter.{i + 7}.Reference",
-            'reference_value': "Device.WiFi.AccessPoint.*.AssociatedDevice.*.Stats.BytesSent"
-        },
-        {
-            'name_path': f"Device.BulkData.Profile.{profile}.Parameter.{i + 8}.Name",
-            'name_value': "Bytes_Received",
-            'reference_path': f"Device.BulkData.Profile.{profile}.Parameter.{i + 8}.Reference",
-            'reference_value': "Device.WiFi.AccessPoint.*.AssociatedDevice.*.Stats.BytesReceived"
-        },
-        {
-            'name_path': f"Device.BulkData.Profile.{profile}.Parameter.{i + 9}.Name",
             'name_value': "Mac_Router",
-            'reference_path': f"Device.BulkData.Profile.{profile}.Parameter.{i + 9}.Reference",
+            'reference_path': f"Device.BulkData.Profile.{profile}.Parameter.{i + 7}.Reference",
             'reference_value': "Device.WiFi.DataElements.Network.Device.1.Radio.*.BSS.2.BSSID"
         }
     ]
@@ -281,7 +213,7 @@ def neighboring_wifi_config(device, profile, i):
         acs.task_set_parameter_values(device, [parameter])
         print(f"Sucesso! {parameter[0]} configurado no profile {profile} do dispositivo {device}.")
 
-def management_and_stats_parameters(device, profile, i):
+def dados(device, profile, i):
 
     parameter_set = [
         {
@@ -380,6 +312,7 @@ def compare_parameter_sets(parameter_set1, parameter_set2):
             differences.append((reference, name, reference_to_name2[reference]))
     print(f"Differences: {differences}")
     return differences
+
 #Selecionando um profile
 def select_profile(device_id):
     profile_choices = []
@@ -461,4 +394,11 @@ print(f"Selected device: {selected_device}")
 
 selected_profile = select_profile(selected_device)
 
+config_profile(selected_device, selected_profile[0], "Collection of Dados", "Dados", "land", "landufrj123", 60, nginx_ip, nginx_port)
+
+dados(selected_device, selected_profile[0], first_empty_parameter(selected_device, selected_profile[0]))
+
+#neighboring_wifi_config(selected_device, selected_profile[0], first_empty_parameter(selected_device, selected_profile[0]))
+
+#dispositivos_conectados(selected_device, selected_profile[0], first_empty_parameter(selected_device, selected_profile[0]))
 
