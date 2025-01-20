@@ -266,4 +266,4 @@ def store_data_in_redis(records: List[Dict[str, Any]], redis_key_prefix: str, re
 
 if __name__ == "__main__":
     uvicorn.run(app, host=os.getenv('UVICORN_HOST'), port=int(os.getenv('UVICORN_PORT')))
-
+    
