@@ -32,7 +32,7 @@ redis_client = redis.Redis(
 def save_redis_data_to_file():
     start_time = time.strftime("%Y%m%d-%H%M%S")
     filename = f"redis_backup_{start_time}.txt"
-    backup_dir = '/home/localuser/codes/backup'
+    backup_dir = os.getenv('BACKUP_DIR')
     
     with open(filename, 'w') as file:
         for key in redis_client.keys('*'):
