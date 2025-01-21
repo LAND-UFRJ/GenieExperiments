@@ -51,14 +51,19 @@ def config_profile(device, profile, alias, name, username, password, interval, i
   
 def dispositivos_conectados(device, profile, i):
     parameter_set = [
-        {'name_value': "Signal Strength WiFi", 'reference_value': "Device.WiFi.AccessPoint.*.AssociatedDevice.*.SignalStrength"},
-        {'name_value': "Mac_AD_WiFi", 'reference_value': "Device.WiFi.AccessPoint.*.AssociatedDevice.*.MACAddress"},
+        {'name_value': "Signal Strength WiFi", 'reference_value': "Device.WiFi.DataElements.Network.Device.1.Radio.*.BSS.2.STA.*.SignalStrength"},
+        {'name_value': "Mac_AD_WiFi", 'reference_value': "Device.WiFi.DataElements.Network.Device.1.Radio.*.BSS.2.STA.*.MACAddress"},
         {'name_value': "HostName", 'reference_value': "Device.Hosts.Host.*.HostName"},
         {'name_value': "Mac_Host", 'reference_value': "Device.Hosts.Host.*.PhysAddress"},
         {'name_value': "Device_ID", 'reference_value': "Device.ManagementServer.ConnectionRequestUsername"},
-        {'name_value': "Packets_Sent", 'reference_value': "Device.WiFi.AccessPoint.*.AssociatedDevice.*.Stats.PacketsSent"},
-        {'name_value': "Packets_Received", 'reference_value': "Device.WiFi.AccessPoint.*.AssociatedDevice.*.Stats.PacketsReceived"},
-        {'name_value': "Mac_Router", 'reference_value': "Device.WiFi.DataElements.Network.Device.1.Radio.*.BSS.2.BSSID"}
+        {'name_value': "Packets_Sent", 'reference_value': "Device.WiFi.DataElements.Network.Device.1.Radio.*.BSS.2.STA.*.PacketsSent"},
+        {'name_value': "Packets_Received", 'reference_value': "Device.WiFi.DataElements.Network.Device.1.Radio.*.BSS.2.STA.*.PacketsReceived"},
+        {'name_value': "Bytes_Sent", 'reference_value': "Device.WiFi.DataElements.Network.Device.1.Radio.*.BSS.2.STA.*.BytesSent"},
+        {'name_value': "Bytes_Received", 'reference_value': "Device.WiFi.DataElements.Network.Device.1.Radio.*.BSS.2.STA.*.BytesReceived"},
+        {'name_value': "Erros_Sent", 'reference_value': "Device.WiFi.DataElements.Network.Device.1.Radio.*.BSS.2.ErrosSent"},
+        {'name_value': "Erros_Received", 'reference_value': "Device.WiFi.DataElements.Network.Device.1.Radio.*.BSS.2.ErrosReceived"},
+        {'name_value': "Mac_Router", 'reference_value': "Device.WiFi.DataElements.Network.Device.1.Radio.*.BSS.2.BSSID"},
+        {'name_value': "Time_since_connected", 'reference_value': "Device.WiFi.DataElements.Network.Device.1.Radio.*.BSS.2.STA.*.LastConnectTime"}
     ]
 
     # Filtra parâmetros únicos
@@ -145,6 +150,7 @@ def dados(device, profile, i):
         {'name_value': "WiFi Channel 2.4GHz/5GHz", 'reference_value': "Device.WiFi.Radio.*.Channel"},
         {'name_value': "Current Channel Bandwidth 2.4GHz/5GHz", 'reference_value': "Device.WiFi.Radio.*.CurrentOperatingChannelBandwidth"},
         {'name_value': "WiFi SSID 2.4GHz/5GHz", 'reference_value': "Device.WiFi.SSID.*.SSID"}
+
     ]
     
     # Filtra parâmetros únicos
@@ -254,9 +260,8 @@ def avoid_duplicate_parameters(device, profile, parameter_set):
     return unique_parameters
 
 def clear_bulkdata(device, profile):
-    config_profile(device, profile, "", "", "", "", 60, "", "" )
+    #config_profile(device, profile, "", "", "", "", 60, "", "" )
     acs.task_set_parameter_values(device, [[f"Device.BulkData.Profile.{profile}.Enable", "false"]])
-
     print(f"BulkData disabled for profile {profile}.")
     for idx in range(1, 108):
         #if not acs.device_get_parameter(device, f"Device.BulkData.Profile.{profile}.Parameter.{idx}.Name"):
@@ -284,11 +289,10 @@ selected_profile = select_profile(selected_device)
 #dados(selected_device, selected_profile[0], first_empty_parameter(selected_device, selected_profile[0]))
 
 #neighboring_wifi_config(selected_device, selected_profile[0], first_empty_parameter(selected_device, selected_profile[0]))
+#acs.task_refresh_object(selected_device, "Device.BulkData")
 
 #dispositivos_conectados(selected_device, selected_profile[0], first_empty_parameter(selected_device, selected_profile[0]))
 
 #clear_bulkdata(selected_device, selected_profile[0])
 
-#see_parameters(selected_device, selected_profile[0])
-
-#dispositivos_conectados(selected_device, selected_profile[0], first_empty_parameter(selected_device, selected_profile[0]))
+see_parameters(selected_device, selected_profile[0])
