@@ -211,7 +211,17 @@ def dados(device, profile, i):
     parameter_set = [
         {'name_value': "Device_ID", 'reference_value': "Device.ManagementServer.ConnectionRequestUsername"},
         {'name_value': "UpTime", 'reference_value': "Device.DeviceInfo.UpTime"},
-        {'name_value': "Bytes Sent WAN/LAN", 'reference_value': "Device.IP.Interface.*.Stats.BytesSent"}
+        {'name_value': "Bytes Sent WAN/LAN", 'reference_value': "Device.IP.Interface.*.Stats.BytesSent"},
+        {'name_value': "Bytes Received WAN/LAN", 'reference_value': "Device.IP.Interface.*.Stats.BytesReceived"},
+        {'name_value': "Packets Sent WAN/LAN", 'reference_value': "Device.IP.Interface.*.Stats.PacketsSent"},
+        {'name_value': "Packets Received WAN/LAN", 'reference_value': "Device.IP.Interface.*.Stats.PacketsReceived"},
+        {'name_value': "Bytes Sent WiFi 2.4GHz/5GHz", 'reference_value': "Device.WiFi.Radio.*.Stats.BytesSent"},
+        {'name_value': "Bytes Received WiFi 2.4GHz/5GHz", 'reference_value': "Device.WiFi.Radio.*.Stats.BytesReceived"},
+        {'name_value': "Packets Sent WiFi 2.4GH/5GHz", 'reference_value': "Device.WiFi.Radio.*.Stats.PacketsSent"},
+        {'name_value': "Packets Received WiFi 2.4GHz/5GHz", 'reference_value': "Device.WiFi.Radio.*.Stats.PacketsReceived"},
+        {'name_value': "WiFi Channel 2.4GHz/5GHz", 'reference_value': "Device.WiFi.Radio.*.Channel"},
+        {'name_value': "Current Channel Bandwidth 2.4GHz/5GHz", 'reference_value': "Device.WiFi.Radio.*.CurrentOperatingChannelBandwidth"},
+        {'name_value': "WiFi SSID 2.4GHz/5GHz", 'reference_value': "Device.WiFi.SSID.*.SSID"}
     ]
     
     # Filtra parâmetros únicos
@@ -359,4 +369,3 @@ selected_profile = select_profile(selected_device)
 #see_parameters(selected_device, selected_profile[0])
 
 #dispositivos_conectados(selected_device, selected_profile[0], first_empty_parameter(selected_device, selected_profile[0]))
-
