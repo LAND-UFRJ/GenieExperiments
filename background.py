@@ -5,7 +5,7 @@ import os
 from dotenv import load_dotenv
 
 # Loading .env file
-load_dotenv(dotenv_path='Land/background.env')
+load_dotenv(dotenv_path='')
 
 
 # Create a Connection object to interact with a GenieACS server
