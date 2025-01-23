@@ -150,7 +150,6 @@ def dados(device, profile, i):
         {'name_value': "WiFi Channel 2.4GHz/5GHz", 'reference_value': "Device.WiFi.Radio.*.Channel"},
         {'name_value': "Current Channel Bandwidth 2.4GHz/5GHz", 'reference_value': "Device.WiFi.Radio.*.CurrentOperatingChannelBandwidth"},
         {'name_value': "WiFi SSID 2.4GHz/5GHz", 'reference_value': "Device.WiFi.DataElements.Network.Device.1.Radio.*.BSS.2.SSID"}
-
     ]
     
     # Filtra parâmetros únicos
@@ -291,8 +290,9 @@ selected_profile = select_profile(selected_device)
 #neighboring_wifi_config(selected_device, selected_profile[0], first_empty_parameter(selected_device, selected_profile[0]))
 #acs.task_refresh_object(selected_device, "Device.BulkData")
 
-dispositivos_conectados('98254A-Device2-223C1S5004290', selected_profile[0], first_empty_parameter(selected_device, selected_profile[0]))
+#dispositivos_conectados('98254A-Device2-223C1S5004290', selected_profile[0], first_empty_parameter(selected_device, selected_profile[0]))
 
 #clear_bulkdata(selected_device, selected_profile[0])
 
 #see_parameters(selected_device, selected_profile[0])
+
