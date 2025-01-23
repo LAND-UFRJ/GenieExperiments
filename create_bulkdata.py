@@ -18,70 +18,22 @@ nginx_ip=os.getenv("NGINX_IP")
 
 def config_profile(device, profile, alias, name, username, password, interval, ip, port):
     bulkdata_config = [
-        {
-            'name_path': "Device.BulkData.Enable",
-            'name_value': "true"
-        },
-        {
-            'name_path': f"Device.BulkData.Profile.{profile}.EncodingType",
-            'name_value': "JSON"
-        },
-        {
-            'name_path': f"Device.BulkData.Profile.{profile}.HTTP.Password",
-            'name_value': f"{password}"
-        },
-        {
-            'name_path': f"Device.BulkData.Profile.{profile}.HTTP.URL",
-            'name_value': f"http://{ip}:{port}/bulkdata"
-        },
-        {
-            'name_path': f"Device.BulkData.Profile.{profile}.HTTP.Method",
-            'name_value': "POST"
-        },
-        {
-            'name_path': f"Device.BulkData.Profile.{profile}.HTTP.UseDateHeader",
-            'name_value': "true"
-        },
-        {
-            'name_path': f"Device.BulkData.Profile.{profile}.HTTP.Username",
-            'name_value': f"{username}"
-        },
-        {
-            'name_path': f"Device.BulkData.Profile.{profile}.JSONEncoding.ReportFormat",
-            'name_value': "ObjectHierarchy"
-        },
-        {
-            'name_path': f"Device.BulkData.Profile.{profile}.JSONEncoding.ReportTimestamp",
-            'name_value': "Unix-Epoch"
-        },
-        {
-            'name_path': f"Device.BulkData.Profile.{profile}.Name",
-            'name_value': f"{name}"
-        },
-        {
-            'name_path': f"Device.BulkData.Profile.{profile}.Protocol",
-            'name_value': "HTTP"
-        },
-        {
-            'name_path': f"Device.BulkData.Profile.{profile}.ReportingInterval",
-            'name_value': f"{interval}"
-        },
-        {
-            'name_path': f"Device.BulkData.Profile.{profile}.X_TP_CollectInterval",
-            'name_value': f"{interval}"
-        },
-        {
-            'name_path': f"Device.BulkData.Profile.{profile}.TimeReference",
-            'name_value': "0"
-        },
-        {
-            'name_path': f"Device.BulkData.Profile.{profile}.Alias",
-            'name_value': f"{alias}"
-        },
-        {
-            'name_path': f"Device.BulkData.Profile.{profile}.Enable",
-            'name_value': "true"
-        }
+        {'name_path': "Device.BulkData.Enable", 'name_value': "true"},
+        {'name_path': f"Device.BulkData.Profile.{profile}.EncodingType", 'name_value': "JSON"},
+        {'name_path': f"Device.BulkData.Profile.{profile}.HTTP.Password", 'name_value': f"{password}"},
+        {'name_path': f"Device.BulkData.Profile.{profile}.HTTP.URL", 'name_value': f"http://{ip}:{port}/bulkdata"},
+        {'name_path': f"Device.BulkData.Profile.{profile}.HTTP.Method", 'name_value': "POST"},
+        {'name_path': f"Device.BulkData.Profile.{profile}.HTTP.UseDateHeader", 'name_value': "true"},
+        {'name_path': f"Device.BulkData.Profile.{profile}.HTTP.Username", 'name_value': f"{username}"},
+        {'name_path': f"Device.BulkData.Profile.{profile}.JSONEncoding.ReportFormat", 'name_value': "ObjectHierarchy"},
+        {'name_path': f"Device.BulkData.Profile.{profile}.JSONEncoding.ReportTimestamp", 'name_value': "Unix-Epoch"},
+        {'name_path': f"Device.BulkData.Profile.{profile}.Name", 'name_value': f"{name}"},
+        {'name_path': f"Device.BulkData.Profile.{profile}.Protocol", 'name_value': "HTTP"},
+        {'name_path': f"Device.BulkData.Profile.{profile}.ReportingInterval", 'name_value': f"{interval}"},
+        {'name_path': f"Device.BulkData.Profile.{profile}.X_TP_CollectInterval", 'name_value': f"{interval}"},
+        {'name_path': f"Device.BulkData.Profile.{profile}.TimeReference", 'name_value': "0"},
+        {'name_path': f"Device.BulkData.Profile.{profile}.Alias", 'name_value': f"{alias}"},
+        {'name_path': f"Device.BulkData.Profile.{profile}.Enable", 'name_value': "true"}
     ]
 
     print(f"Configurando BulkData no dispositivo {device}")
@@ -99,39 +51,39 @@ def config_profile(device, profile, alias, name, username, password, interval, i
   
 def dispositivos_conectados(device, profile, i):
     parameter_set = [
-        {
-            'name_value': "Signal Strength WiFi",
-            'reference_value': "Device.WiFi.AccessPoint.*.AssociatedDevice.*.SignalStrength"
-        },
-        {
-            'name_value': "Mac_AD_WiFi",
-            'reference_value': "Device.WiFi.AccessPoint.*.AssociatedDevice.*.MACAddress"
-        },
-        {
-            'name_value': "HostName",
-            'reference_value': "Device.Hosts.Host.*.HostName"
-        },
-        {
-            'name_value': "Mac_Host",
-            'reference_value': "Device.Hosts.Host.*.PhysAddress"
-        },
-        {
-            'name_value': "Device_ID",
-            'reference_value': "Device.ManagementServer.ConnectionRequestUsername"
-        },
-        {
-            'name_value': "Packets_Sent",
-            'reference_value': "Device.WiFi.AccessPoint.*.AssociatedDevice.*.Stats.PacketsSent"
-        },
-        {
-            'name_value': "Packets_Received",
-            'reference_value': "Device.WiFi.AccessPoint.*.AssociatedDevice.*.Stats.PacketsReceived"
-        },
-        {
-            'name_value': "Mac_Router",
-            'reference_value': "Device.WiFi.DataElements.Network.Device.1.Radio.*.BSS.2.BSSID"
-        }
+        {'name_value': "Signal Strength WiFi", 'reference_value': "Device.WiFi.DataElements.Network.Device.1.Radio.*.BSS.2.STA.*.SignalStrength"},
+        {'name_value': "Mac_AD_WiFi", 'reference_value': "Device.WiFi.DataElements.Network.Device.1.Radio.*.BSS.2.STA.*.MACAddress"},
+        {'name_value': "HostName", 'reference_value': "Device.Hosts.Host.*.HostName"},
+        {'name_value': "Mac_Host", 'reference_value': "Device.Hosts.Host.*.PhysAddress"},
+        {'name_value': "Device_ID", 'reference_value': "Device.ManagementServer.ConnectionRequestUsername"},
+        {'name_value': "Packets_Sent", 'reference_value': "Device.WiFi.DataElements.Network.Device.1.Radio.*.BSS.2.STA.*.PacketsSent"},
+        {'name_value': "Packets_Received", 'reference_value': "Device.WiFi.DataElements.Network.Device.1.Radio.*.BSS.2.STA.*.PacketsReceived"},
+        {'name_value': "Bytes_Sent", 'reference_value': "Device.WiFi.DataElements.Network.Device.1.Radio.*.BSS.2.STA.*.BytesSent"},
+        {'name_value': "Bytes_Received", 'reference_value': "Device.WiFi.DataElements.Network.Device.1.Radio.*.BSS.2.STA.*.BytesReceived"},
+        {'name_value': "Erros_Sent", 'reference_value': "Device.WiFi.DataElements.Network.Device.1.Radio.*.BSS.2.STA.*.ErrosSent"},
+        {'name_value': "Erros_Received", 'reference_value': "Device.WiFi.DataElements.Network.Device.1.Radio.*.BSS.2.STA.*.ErrosReceived"},
+        {'name_value': "Mac_Router", 'reference_value': "Device.WiFi.DataElements.Network.Device.1.Radio.*.BSS.2.BSSID"},
+        {'name_value': "Time_since_connected", 'reference_value': "Device.WiFi.DataElements.Network.Device.1.Radio.*.BSS.2.STA.*.LastConnectTime"}
     ]
+
+    # Filtra parâmetros únicos
+    unique_parameters = avoid_duplicate_parameters(device, profile, parameter_set)
+    
+    # Escreve os parâmetros únicos
+    current_index = i  # Índice inicial
+    for param in unique_parameters:
+        # Gera os paths dinamicamente
+        parameter_name_path = f"Device.BulkData.Profile.{profile}.Parameter.{current_index}.Name"
+        parameter_reference_path = f"Device.BulkData.Profile.{profile}.Parameter.{current_index}.Reference"
+        
+        acs.task_set_parameter_values(device, [
+            [parameter_name_path, param['name_value']],
+            [parameter_reference_path, param['reference_value']]
+        ])
+        print(f"Sucesso! {param['name_value']} configurado no profile {profile} do dispositivo {device}.")
+        
+        # Incrementa o índice apenas para parâmetros escritos
+        current_index += 1
 
     existing_parameters = avoid_duplicate_parameters(device, profile, parameter_set)
     
@@ -154,38 +106,14 @@ def dispositivos_conectados(device, profile, i):
 
 def neighboring_wifi_config(device, profile, i):
     parameter_set = [
-        {
-            'name_value': "FrequencyBand_NBW",
-            'reference_value': "Device.WiFi.NeighboringWiFiDiagnostic.Result.*.OperatingFrequencyBand"
-        },
-        {
-            'name_value': "ChannelBandwidth_NBW",
-            'reference_value': "Device.WiFi.NeighboringWiFiDiagnostic.Result.*.OperatingChannelBandwidth"
-        },
-        {
-            'name_value': "SSID_NBW",
-            'reference_value': "Device.WiFi.NeighboringWiFiDiagnostic.Result.*.SSID"
-        },
-        {
-            'name_value': "signal_strength_NBW",
-            'reference_value': "Device.WiFi.NeighboringWiFiDiagnostic.Result.*.SignalStrength"
-        },
-        {
-            'name_value': "Mac_NBW",
-            'reference_value': "Device.WiFi.NeighboringWiFiDiagnostic.Result.*.BSSID"
-        },
-        {
-            'name_value': "Channel_NBW",
-            'reference_value': "Device.WiFi.NeighboringWiFiDiagnostic.Result.*.Channel"
-        },
-        {
-            'name_value': "Device_ID",
-            'reference_value': "Device.ManagementServer.ConnectionRequestUsername"
-        },
-        {
-            'name_value': "Mac_Router",
-            'reference_value': "Device.WiFi.DataElements.Network.Device.1.Radio.*.BSS.2.BSSID"
-        }
+        {'name_value': "FrequencyBand_NBW", 'reference_value': "Device.WiFi.NeighboringWiFiDiagnostic.Result.*.OperatingFrequencyBand"},
+        {'name_value': "ChannelBandwidth_NBW", 'reference_value': "Device.WiFi.NeighboringWiFiDiagnostic.Result.*.OperatingChannelBandwidth"},
+        {'name_value': "SSID_NBW", 'reference_value': "Device.WiFi.NeighboringWiFiDiagnostic.Result.*.SSID"},
+        {'name_value': "signal_strength_NBW", 'reference_value': "Device.WiFi.NeighboringWiFiDiagnostic.Result.*.SignalStrength"},
+        {'name_value': "Mac_NBW", 'reference_value': "Device.WiFi.NeighboringWiFiDiagnostic.Result.*.BSSID"},
+        {'name_value': "Channel_NBW", 'reference_value': "Device.WiFi.NeighboringWiFiDiagnostic.Result.*.Channel"},
+        {'name_value': "Device_ID", 'reference_value': "Device.ManagementServer.ConnectionRequestUsername"},
+        {'name_value': "Mac_Router", 'reference_value': "Device.WiFi.DataElements.Network.Device.1.Radio.*.BSS.2.BSSID"}
     ]
 
     existing_parameters = avoid_duplicate_parameters(device, profile, parameter_set)
@@ -221,7 +149,7 @@ def dados(device, profile, i):
         {'name_value': "Packets Received WiFi 2.4GHz/5GHz", 'reference_value': "Device.WiFi.Radio.*.Stats.PacketsReceived"},
         {'name_value': "WiFi Channel 2.4GHz/5GHz", 'reference_value': "Device.WiFi.Radio.*.Channel"},
         {'name_value': "Current Channel Bandwidth 2.4GHz/5GHz", 'reference_value': "Device.WiFi.Radio.*.CurrentOperatingChannelBandwidth"},
-        {'name_value': "WiFi SSID 2.4GHz/5GHz", 'reference_value': "Device.WiFi.SSID.*.SSID"}
+        {'name_value': "WiFi SSID 2.4GHz/5GHz", 'reference_value': "Device.WiFi.DataElements.Network.Device.1.Radio.*.BSS.2.SSID"}
     ]
     
     # Filtra parâmetros únicos
@@ -331,9 +259,8 @@ def avoid_duplicate_parameters(device, profile, parameter_set):
     return unique_parameters
 
 def clear_bulkdata(device, profile):
-    config_profile(device, profile, "", "", "", "", 60, "", "" )
+    #config_profile(device, profile, "", "", "", "", 60, "", "" )
     acs.task_set_parameter_values(device, [[f"Device.BulkData.Profile.{profile}.Enable", "false"]])
-
     print(f"BulkData disabled for profile {profile}.")
     for idx in range(1, 108):
         #if not acs.device_get_parameter(device, f"Device.BulkData.Profile.{profile}.Parameter.{idx}.Name"):
@@ -361,11 +288,11 @@ selected_profile = select_profile(selected_device)
 #dados(selected_device, selected_profile[0], first_empty_parameter(selected_device, selected_profile[0]))
 
 #neighboring_wifi_config(selected_device, selected_profile[0], first_empty_parameter(selected_device, selected_profile[0]))
+#acs.task_refresh_object(selected_device, "Device.BulkData")
 
-#dispositivos_conectados(selected_device, selected_profile[0], first_empty_parameter(selected_device, selected_profile[0]))
+#dispositivos_conectados('98254A-Device2-223C1S5004290', selected_profile[0], first_empty_parameter(selected_device, selected_profile[0]))
 
 #clear_bulkdata(selected_device, selected_profile[0])
 
 #see_parameters(selected_device, selected_profile[0])
 
-#dispositivos_conectados(selected_device, selected_profile[0], first_empty_parameter(selected_device, selected_profile[0]))

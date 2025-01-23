@@ -115,12 +115,12 @@ def insert_redes_proximas_data(connection, detected_at, device_id, bssid_router,
     data = (detected_at, device_id, bssid_router, bssid_rede, signal_strength, ssid_rede, channel, channel_bandwidth)
     insert_data_into_timescale(connection, query, data, 'redes_proximas')
 
-def insert_wifi_data(connection, time, device_id, mac_address, hostname, signal_strength, packets_sent, packets_received):
+def insert_wifi_data(connection, time, device_id, mac_address, hostname, signal_strength, packets_sent, packets_received, bytes_sent, bytes_received, errors_sent, errors_received, radio_connected, time_since_connected):
     query = sql.SQL("""
-        INSERT INTO wifi_stats (time, device_id, mac_address, hostname, signal_strength, packets_sent, packets_received)
-        VALUES (%s, %s, %s, %s, %s, %s, %s)
+        INSERT INTO wifi_stats (time, device_id, mac_address, hostname, signal_strength, packets_sent, packets_received, bytes_sent, bytes_received, errors_sent, errors_received, radio_connected, time_since_connected)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
     """)
-    data = (time, device_id, mac_address, hostname, signal_strength, packets_sent, packets_received)
+    data = (time, device_id, mac_address, hostname, signal_strength, packets_sent, packets_received, bytes_sent, bytes_received, errors_sent, errors_received, radio_connected, time_since_connected)
     insert_data_into_timescale(connection, query, data, 'wifi_stats')
 
 def insert_dados(connection, time, device_id, wan_bytes_sent, wan_bytes_received, wan_packets_sent, wan_packets_received, lan_bytes_sent, lan_bytes_received, lan_packets_sent, lan_packets_received, wifi_bytes_sent, wifi_bytes_received, wifi_packets_sent, wifi_packets_received, signal_pon, wifi2_4channel, wifi2_4bandwith, wifi2_4ssid, wifi_5_channel, wifi_5_bandwith, wifi_5_ssid, uptime):
@@ -156,8 +156,8 @@ def process_redis_keys(connection_geo, connection_bulkdata, processed_keys):
                     _, detected_at, device_id, bssid_router, bssid_rede, signal_strength, ssid_rede, channel, channel_bandwidth = key.split(";")
                     insert_redes_proximas_data(connection_geo, detected_at, device_id, bssid_router, bssid_rede, signal_strength, ssid_rede, channel, channel_bandwidth)
                 elif prefix == 'wifistats;':
-                    _, time, device_id, mac_address, hostname, signal_strength, packets_sent, packets_received = key.split(";")
-                    insert_wifi_data(connection_bulkdata, time, device_id, mac_address, hostname, signal_strength, packets_sent, packets_received)
+                    _, time, device_id, mac_address, hostname, signal_strength, packets_sent, packets_received, bytes_sent, bytes_received, errors_sent, errors_received, radio_connected, time_since_connected = key.split(";")
+                    insert_wifi_data(connection_bulkdata, time, device_id, mac_address, hostname, signal_strength, packets_sent, packets_received, bytes_sent, bytes_received, errors_sent, errors_received, radio_connected, time_since_connected)
                 elif prefix == 'dados;' :
                     _, time, device_id, wan_bytes_sent, wan_bytes_received, wan_packets_sent, wan_packets_received, lan_bytes_sent, lan_bytes_received, lan_packets_sent, lan_packets_received, wifi_bytes_sent, wifi_bytes_received, wifi_packets_sent, wifi_packets_received, signal_pon, wifi2_4_channel, wifi2_4bandwith, wifi2_4ssid, wifi_5_channel, wifi_5_bandwith, wifi_5_ssid, uptime = key.split(";")
                     insert_dados(connection_bulkdata, time, device_id, wan_bytes_sent, wan_bytes_received, wan_packets_sent, wan_packets_received, lan_bytes_sent, lan_bytes_received, lan_packets_sent, lan_packets_received, wifi_bytes_sent, wifi_bytes_received, wifi_packets_sent, wifi_packets_received, signal_pon, wifi2_4_channel, wifi2_4bandwith, wifi2_4ssid, wifi_5_channel, wifi_5_bandwith, wifi_5_ssid, uptime)

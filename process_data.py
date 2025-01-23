@@ -73,7 +73,7 @@ async def receive_bulkdata(request: Request):
         print(f"Registro de Routers processados: {routers_records}")
         
         store_data_in_redis(nbw_records, "redes_proximas", "redes_proximas_stream", ["detected_at", "device_id", "bssid_router", "bssid_rede", "signal_strength", "ssid_rede", "channel", "channel_bandwidth"])
-        store_data_in_redis(wifistats_records, "wifistats", "wifistats_stream", ["time", "device_id", "mac_address", "hostname", "signal_strength", "packets_sent", "packets_received"])
+        store_data_in_redis(wifistats_records, "wifistats", "wifistats_stream", ["time", "device_id", "mac_address", "hostname", "signal_strength", "packets_sent", "packets_received", "bytes_sent", "bytes_received", "errors_sent", "errors_received", "radio_connected", "time_since_connected"])
         store_data_in_redis(dados_records, "dados", "dados_stream", ["time", "device_id", "wan_bytes_sent", "wan_bytes_received", "wan_packets_sent", "wan_packets_received", "lan_bytes_sent", "lan_bytes_received", "lan_packets_sent", "lan_packets_received", "wifi_bytes_sent", "wifi_bytes_received", "wifi_packets_sent", "wifi_packets_received", "signal_pon", "wifi2_4_channel", "wifi2_4bandwith", "wifi2_4ssid", "wifi_5_channel", "wifi_5_bandwith", "wifi_5_ssid", "uptime"])
         #store_data_in_redis(routers_records, "routers", "routers_stream", ["device_id", "latitude", "longitude", "ssid", "mac_address"])
         return {"message": "Dados processados e enviados ao Redis com sucesso."}
@@ -160,58 +160,111 @@ def process_neighboring_wifi(item: DeviceData, collection_time: datetime, device
 
 def process_wifi_stats(item, collection_time, device_id, records):
     host_data = item.Device.get('Hosts', {}).get('Host', {})
-    #print(f"host_data: {host_data}")
+    radio_network_data = item.Device.get('WiFi', {}).get('DataElements', {}).get('Network', {}).get('Device', {}).get('1', {}).get('Radio', {})
+    AD2_4GHz_data = radio_network_data.get('1', {}).get('BSS', {}).get('2', {}).get('STA', {})
+    AD5GHz_data = radio_network_data.get('2', {}).get('BSS', {}).get('2', {}).get('STA', {})
+
     if not isinstance(host_data, dict):  # Verifica se host_data é um dicionário
         host_data = {}
 
-    accesspoint_data = item.Device.get('WiFi', {}).get('AccessPoint', {})
-    #print(f"accesspoint_data: {accesspoint_data}")
-    if not isinstance(accesspoint_data, dict):  # Verifica se accesspoint_data é um dicionário
-        accesspoint_data = {}
+    if not isinstance(radio_network_data, dict):  # Verifica se radio_network_data é um dicionário
+        radio_network_data = {}
 
     for host in host_data.values():
         hostname = host.get('HostName', '0')
         mac_address_host = str(host.get('PhysAddress', '0').upper())
-        for ap in accesspoint_data.values():
-            associateddevice = ap.get('AssociatedDevice', {})
-            if isinstance(associateddevice, dict):  # Verifica se AssociatedDevice é um dicionário
-                for ad in associateddevice.values():
-                    mac_address_ap = str(ad.get('MACAddress', '0').upper())
-                    signal_strength = int(ad.get('SignalStrength', 0))
-                    packets_sent = int(ad.get('Stats', {}).get('PacketsSent', 0))
-                    packets_received = int(ad.get('Stats', {}).get('PacketsReceived', 0))
-                    if mac_address_host == mac_address_ap:
-                        record = {
-                            "time": collection_time.astimezone(timezone(timedelta(hours=-3))).isoformat(),  # Convertendo para o fuso horário brasileiro
-                            "device_id": device_id,
-                            "mac_address": mac_address_ap,
-                            "hostname": hostname,
-                            "signal_strength": signal_strength,
-                            "packets_sent": packets_sent,
-                            "packets_received": packets_received
-                        }
-                        records.append(record)
-                        print(f"WiFi Stats Processado: {record}")
-            else:
-                print("AssociatedDevice não é um dicionário:", associateddevice)
+        for ad2_4 in AD2_4GHz_data.values():
+            mac_address2_4 = ad2_4.get('MACAddress', '0')
+            if mac_address_host == mac_address2_4:
+                record = {
+                    "time": collection_time.astimezone(timezone(timedelta(hours=-3))).isoformat(),  # Convertendo para o fuso horário brasileiro
+                    "device_id": device_id,
+                    "mac_address": mac_address2_4,
+                    "hostname": hostname,
+                    "signal_strength": int((int(ad2_4.get('SignalStrength', '0')) / 2) - 110), #(resultado/2) -110
+                    "packets_sent": ad2_4.get('PacketsSent', '0'),
+                    "packets_received": ad2_4.get('PacketsReceived', '0'),
+                    "bytes_sent": ad2_4.get('BytesSent', '0'),
+                    "bytes_received": ad2_4.get('BytesReceived', '0'),
+                    "errors_sent": ad2_4.get('ErrorsSent', '0'),
+                    "errors_received": ad2_4.get('ErrorsReceived', '0'),
+                    "radio_connected": "2.4GHz",
+                    "time_since_connected": ad2_4.get('LastConnectTime', '0')
+                }
+                records.append(record)
+                print(f"WiFi Stats Processado: {record}")
+
+        for ad5 in AD5GHz_data.values():
+            mac_address5 = ad5.get('MACAddress', '0')
+            if mac_address_host == mac_address5:
+                record = {
+                    "time": collection_time.astimezone(timezone(timedelta(hours=-3))).isoformat(),  # Convertendo para o fuso horário brasileiro
+                    "device_id": device_id,
+                    "mac_address": mac_address5,
+                    "hostname": hostname,
+                    "signal_strength": int((int(ad5.get('SignalStrength', '0')) / 2) - 110),
+                    "packets_sent": ad5.get('PacketsSent', '0'),
+                    "packets_received": ad5.get('PacketsReceived', '0'),
+                    "bytes_sent": ad5.get('BytesSent', '0'),
+                    "bytes_received": ad5.get('BytesReceived', '0'),
+                    "errors_sent": ad5.get('ErrorsSent', '0'),
+                    "errors_received": ad5.get('ErrorsReceived', '0'),
+                    "radio_connected": "5GHz",
+                    "time_since_connected": ad5.get('LastConnectTime', '0')
+                }
+                records.append(record)
+                print(f"WiFi Stats Processado: {record}")
+
     return records
 
 def dados(item: DeviceData, collection_time: datetime, device_id, records: List[Dict[str, Any]]):
-    ip_lan = item.Device.get('IP', {}).get('Interface', {}).get('1', {}).get('Stats', {})
-    ip_wan = item.Device.get('IP', {}).get('Interface', {}).get('4', {}).get('Stats', {})
+    # Inicialização correta das variáveis
+    total_packets_sent2_4 = total_packets_sent5 = 0
+    total_packets_received2_4 = total_packets_received5 = 0
+    total_bytes_sent2_4 = total_bytes_sent5 = 0
+    total_bytes_received2_4 = total_bytes_received5 = 0
 
-    if not isinstance(ip_lan, dict):
-        ip_lan = {}
-    if not isinstance(ip_wan, dict):
-        ip_wan = {}
+    # Acessando dados com fallback seguro
+    interfaces = item.Device.get('IP', {}).get('Interface', {})
+    ip_lan = interfaces.get('1', {}).get('Stats', {}) if isinstance(interfaces, dict) else {}
+    ip_wan = interfaces.get('4', {}).get('Stats', {}) if isinstance(interfaces, dict) else {}
 
+    radio_network_data = item.Device.get('WiFi', {}).get('DataElements', {}).get('Network', {}).get('Device', {}).get('1', {}).get('Radio', {})
+    
+    # Coleta de dados WiFi 2.4GHz
+    AD2_4GHz_data = {}
+    if '1' in radio_network_data:
+        bss = radio_network_data['1'].get('BSS', {})
+        AD2_4GHz_data = bss.get('2', {}).get('STA', {}) if isinstance(bss, dict) else {}
+
+    # Coleta de dados WiFi 5GHz
+    AD5GHz_data = {}
+    if '2' in radio_network_data:
+        bss = radio_network_data['2'].get('BSS', {})
+        AD5GHz_data = bss.get('2', {}).get('STA', {}) if isinstance(bss, dict) else {}
+
+    # Processamento WiFi 2.4GHz
+    for ad2_4 in AD2_4GHz_data.values():
+        if isinstance(ad2_4, dict):
+            total_packets_sent2_4 += int(ad2_4.get('PacketsSent', -1))
+            total_packets_received2_4 += int(ad2_4.get('PacketsReceived', -1))
+            total_bytes_sent2_4 += int(ad2_4.get('BytesSent', -1))
+            total_bytes_received2_4 += int(ad2_4.get('BytesReceived', -1))
+
+    # Processamento WiFi 5GHz
+    for ad5 in AD5GHz_data.values():
+        if isinstance(ad5, dict):
+            total_packets_sent5 += int(ad5.get('PacketsSent', -1))
+            total_packets_received5 += int(ad5.get('PacketsReceived', -1))
+            total_bytes_sent5 += int(ad5.get('BytesSent', -1))
+            total_bytes_received5 += int(ad5.get('BytesReceived', -1))
+
+    # Dados WiFi
     wifi = item.Device.get('WiFi', {}).get('Radio', {})
-    wifi2_4 = wifi.get('1', {})
-    wifi2_4status = wifi2_4.get('Stats', {})
-    wifi5 = wifi.get('2', {})
-    wifi5status = wifi5.get('Stats', {})
+    wifi2_4 = wifi.get('1', {}) if isinstance(wifi, dict) else {}
+    wifi5 = wifi.get('2', {}) if isinstance(wifi, dict) else {}
 
-    # Create the record dictionary
+    # Montagem do registro
     record = {
         "time": collection_time.astimezone(timezone(timedelta(hours=-3))).isoformat(),
         "device_id": device_id,
@@ -223,32 +276,27 @@ def dados(item: DeviceData, collection_time: datetime, device_id, records: List[
         "lan_bytes_received": int(ip_lan.get('BytesReceived', -1)),
         "lan_packets_sent": int(ip_lan.get('PacketsSent', -1)),
         "lan_packets_received": int(ip_lan.get('PacketsReceived', -1)),
-        "wifi_bytes_sent": int(wifi2_4status.get('BytesSent', -1)) + int(wifi5status.get('BytesSent', -1)),
-        "wifi_bytes_received": int(wifi2_4status.get('BytesReceived', -1)) + int(wifi5status.get('BytesReceived', -1)),
-        "wifi_packets_sent": int(wifi2_4status.get('PacketsSent', -1)) + int(wifi5status.get('PacketsSent', -1)),
-        "wifi_packets_received": int(wifi2_4status.get('PacketsReceived', -1)) + int(wifi5status.get('PacketsReceived', -1)),
-        "signal_pon": int(-1),
+        "wifi_bytes_sent": total_bytes_sent2_4 + total_bytes_sent5,
+        "wifi_bytes_received": total_bytes_received2_4 + total_bytes_received5,
+        "wifi_packets_sent": total_packets_sent2_4 + total_packets_sent5,
+        "wifi_packets_received": total_packets_received2_4 + total_packets_received5,
+        "signal_pon": -1,
         "wifi2_4_channel": int(wifi2_4.get('Channel', -1)),
         "wifi2_4bandwith": wifi2_4.get('CurrentOperatingChannelBandwidth', 'Unknown'),
-        "wifi2_4ssid": item.Device.get('WiFi',{}).get('SSID', {}).get('1', {}).get('SSID', 'Unknown'),
+        "wifi2_4ssid": radio_network_data.get('1', {}).get('BSS', {}).get('2', {}).get('SSID', 'Unknown'),
         "wifi_5_channel": int(wifi5.get('Channel', -1)),
         "wifi_5_bandwith": wifi5.get('CurrentOperatingChannelBandwidth', 'Unknown'),
-        "wifi_5_ssid": item.Device.get('WiFi',{}).get('SSID', {}).get('3', {}).get('SSID', 'Unknown'),
+        "wifi_5_ssid": radio_network_data.get('2', {}).get('BSS', {}).get('2', {}).get('SSID', 'Unknown'),
         "uptime": int(item.Device.get('DeviceInfo', {}).get('UpTime', -1))
     }
 
-    # Define critical fields that must have values other than -1
-    critical_fields = [
-        "wan_bytes_sent",
-        "lan_bytes_sent"
-    ]
-
-    # Check if all critical fields have valid values
+    # Verificação de campos críticos
+    critical_fields = ["wan_bytes_sent", "lan_bytes_sent"]
     if all(record[field] != -1 for field in critical_fields):
         records.append(record)
         print(f"Dados Processados: {record}")
     else:
-        print("Skipping record due to missing critical values.")
+        print("Registro ignorado devido a valores críticos ausentes.")
 
     return records
 
@@ -266,4 +314,3 @@ def store_data_in_redis(records: List[Dict[str, Any]], redis_key_prefix: str, re
 
 if __name__ == "__main__":
     uvicorn.run(app, host=os.getenv('UVICORN_HOST'), port=int(os.getenv('UVICORN_PORT')))
-    
