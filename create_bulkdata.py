@@ -60,8 +60,8 @@ def dispositivos_conectados(device, profile, i):
         {'name_value': "Packets_Received", 'reference_value': "Device.WiFi.DataElements.Network.Device.1.Radio.*.BSS.2.STA.*.PacketsReceived"},
         {'name_value': "Bytes_Sent", 'reference_value': "Device.WiFi.DataElements.Network.Device.1.Radio.*.BSS.2.STA.*.BytesSent"},
         {'name_value': "Bytes_Received", 'reference_value': "Device.WiFi.DataElements.Network.Device.1.Radio.*.BSS.2.STA.*.BytesReceived"},
-        {'name_value': "Erros_Sent", 'reference_value': "Device.WiFi.DataElements.Network.Device.1.Radio.*.BSS.2.ErrosSent"},
-        {'name_value': "Erros_Received", 'reference_value': "Device.WiFi.DataElements.Network.Device.1.Radio.*.BSS.2.ErrosReceived"},
+        {'name_value': "Erros_Sent", 'reference_value': "Device.WiFi.DataElements.Network.Device.1.Radio.*.BSS.2.STA.*.ErrosSent"},
+        {'name_value': "Erros_Received", 'reference_value': "Device.WiFi.DataElements.Network.Device.1.Radio.*.BSS.2.STA.*.ErrosReceived"},
         {'name_value': "Mac_Router", 'reference_value': "Device.WiFi.DataElements.Network.Device.1.Radio.*.BSS.2.BSSID"},
         {'name_value': "Time_since_connected", 'reference_value': "Device.WiFi.DataElements.Network.Device.1.Radio.*.BSS.2.STA.*.LastConnectTime"}
     ]
@@ -149,7 +149,7 @@ def dados(device, profile, i):
         {'name_value': "Packets Received WiFi 2.4GHz/5GHz", 'reference_value': "Device.WiFi.Radio.*.Stats.PacketsReceived"},
         {'name_value': "WiFi Channel 2.4GHz/5GHz", 'reference_value': "Device.WiFi.Radio.*.Channel"},
         {'name_value': "Current Channel Bandwidth 2.4GHz/5GHz", 'reference_value': "Device.WiFi.Radio.*.CurrentOperatingChannelBandwidth"},
-        {'name_value': "WiFi SSID 2.4GHz/5GHz", 'reference_value': "Device.WiFi.SSID.*.SSID"}
+        {'name_value': "WiFi SSID 2.4GHz/5GHz", 'reference_value': "Device.WiFi.DataElements.Network.Device.1.Radio.*.BSS.2.SSID"}
 
     ]
     
@@ -291,8 +291,8 @@ selected_profile = select_profile(selected_device)
 #neighboring_wifi_config(selected_device, selected_profile[0], first_empty_parameter(selected_device, selected_profile[0]))
 #acs.task_refresh_object(selected_device, "Device.BulkData")
 
-#dispositivos_conectados(selected_device, selected_profile[0], first_empty_parameter(selected_device, selected_profile[0]))
+dispositivos_conectados('98254A-Device2-223C1S5004290', selected_profile[0], first_empty_parameter(selected_device, selected_profile[0]))
 
 #clear_bulkdata(selected_device, selected_profile[0])
 
-see_parameters(selected_device, selected_profile[0])
+#see_parameters(selected_device, selected_profile[0])
