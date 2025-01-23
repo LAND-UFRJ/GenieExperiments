@@ -17,8 +17,25 @@ acs = genieacs.Connection(
     port=os.getenv("GENIE_PORT")
 )
 
-devices = acs.device_get_all_IDs()  # Get all devices available
-print(devices)
+def fetch_devices():
+    global devices
+    devices = acs.device_get_all_IDs()  # Get all devices available
+    print(devices)
+
+# Schedule the fetch_devices function to run every 20 minutes
+schedule.every(20).minutes.do(fetch_devices)
+
+# Initial fetch
+fetch_devices()
+
+# Start the scheduler in a separate thread
+def run_scheduler():
+    while True:
+        schedule.run_pending()
+        time.sleep(1)
+
+scheduler_thread = ThreadPoolExecutor(max_workers=1)
+scheduler_thread.submit(run_scheduler)
 
 def process_device(device):
     z = 0
