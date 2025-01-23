@@ -1,10 +1,10 @@
 # GenieExperiments
 
-Repositório do laboratório de computação LAND da COPPE/UFRJ para o projeto de **geolocalização baseada em site survey**, utilizando dados coletados pelo GenieACS, processados via Nginx, Redis e TimescaleDB.
+Repositório do laboratório de computação LAND da COPPE/UFRJ para o projeto de coleta, monitoramento e análise de dados de redes, utilizando dados coletados pelo GenieACS, processados via Nginx, Redis e TimescaleDB.
 
 ## Descrição
 
-Este projeto tem como objetivo coletar, processar e armazenar dados de geolocalização obtidos a partir de uma pesquisa de site survey. O fluxo de dados é o seguinte:
+Este projeto tem como objetivo coletar, processar e armazenar dados de redes de CPEs monitoradas via GenieACS usando o protocolo TR-069. O fluxo de dados é o seguinte:
 
 1. **GenieACS**: Coleta dados de dispositivos via `bulkdata`.
 2. **Nginx**: Recebe os dados do GenieACS e os encaminha para um servidor HTTP.
