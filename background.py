@@ -3,6 +3,7 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 import os
 from dotenv import load_dotenv
+import schedule
 
 # Loading .env file
 load_dotenv(dotenv_path='')
