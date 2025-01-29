@@ -246,18 +246,42 @@ def dados(item: DeviceData, collection_time: datetime, device_id, records: List[
     # Processamento WiFi 2.4GHz
     for ad2_4 in AD2_4GHz_data.values():
         if isinstance(ad2_4, dict):
-            total_packets_sent2_4 += int(ad2_4.get('PacketsSent', -1))
-            total_packets_received2_4 += int(ad2_4.get('PacketsReceived', -1))
-            total_bytes_sent2_4 += int(ad2_4.get('BytesSent', -1))
-            total_bytes_received2_4 += int(ad2_4.get('BytesReceived', -1))
+            total_packets_sent2_4 += int(ad2_4.get('PacketsSent', 0))
+            total_packets_received2_4 += int(ad2_4.get('PacketsReceived', 0))
+            total_bytes_sent2_4 += int(ad2_4.get('BytesSent', 0))
+            total_bytes_received2_4 += int(ad2_4.get('BytesReceived', 0))
 
     # Processamento WiFi 5GHz
     for ad5 in AD5GHz_data.values():
         if isinstance(ad5, dict):
-            total_packets_sent5 += int(ad5.get('PacketsSent', -1))
-            total_packets_received5 += int(ad5.get('PacketsReceived', -1))
-            total_bytes_sent5 += int(ad5.get('BytesSent', -1))
-            total_bytes_received5 += int(ad5.get('BytesReceived', -1))
+            total_packets_sent5 += int(ad5.get('PacketsSent', 0))
+            total_packets_received5 += int(ad5.get('PacketsReceived', 0))
+            total_bytes_sent5 += int(ad5.get('BytesSent', 0))
+            total_bytes_received5 += int(ad5.get('BytesReceived', 0))
+
+    # Manter o tráfego dos dispositivos desconectados
+    previous_data = redis_client.hgetall(f"previous_data:{device_id}")
+    if previous_data:
+        total_packets_sent2_4 += int(previous_data.get('total_packets_sent2_4', 0))
+        total_packets_received2_4 += int(previous_data.get('total_packets_received2_4', 0))
+        total_bytes_sent2_4 += int(previous_data.get('total_bytes_sent2_4', 0))
+        total_bytes_received2_4 += int(previous_data.get('total_bytes_received2_4', 0))
+        total_packets_sent5 += int(previous_data.get('total_packets_sent5', 0))
+        total_packets_received5 += int(previous_data.get('total_packets_received5', 0))
+        total_bytes_sent5 += int(previous_data.get('total_bytes_sent5', 0))
+        total_bytes_received5 += int(previous_data.get('total_bytes_received5', 0))
+
+    # Armazenar os dados atuais para uso futuro
+    redis_client.hmset(f"previous_data:{device_id}", {
+        'total_packets_sent2_4': total_packets_sent2_4,
+        'total_packets_received2_4': total_packets_received2_4,
+        'total_bytes_sent2_4': total_bytes_sent2_4,
+        'total_bytes_received2_4': total_bytes_received2_4,
+        'total_packets_sent5': total_packets_sent5,
+        'total_packets_received5': total_packets_received5,
+        'total_bytes_sent5': total_bytes_sent5,
+        'total_bytes_received5': total_bytes_received5
+    })
 
     # Dados WiFi
     wifi = item.Device.get('WiFi', {}).get('Radio', {})
