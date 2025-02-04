@@ -9,6 +9,16 @@ from dotenv import load_dotenv
 load_dotenv(dotenv_path='')
 load_dotenv(dotenv_path='')
 
+# Configuração do logger
+logging.basicConfig(
+    level=logging.INFO,
+    format="[%(levelname)s] %(asctime)s %(message)s",
+    handlers=[
+        logging.FileHandler("log/redis_to_timescaled.log"),
+        logging.StreamHandler()
+    ]
+)
+
 # Configurações do Redis
 REDIS_HOST = os.getenv('REDIS_HOST')
 REDIS_PORT = int(os.getenv('REDIS_PORT'))
@@ -77,7 +87,7 @@ def connect_to_timescale():
             user=PG_USER,
             password=PG_PASSWORD
         )
-        print("Conexão com TimescaleDB (geo) bem-sucedida.")
+        logging.info("Conexão com TimescaleDB (geo) bem-sucedida.")
 
         # Conexão ao segundo banco de dados
         connection_bulkdata = psycopg2.connect(
@@ -87,12 +97,12 @@ def connect_to_timescale():
             user=PG_USER,
             password=PG_PASSWORD
         )
-        print("Conexão com TimescaleDB (bulkdata) bem-sucedida.")
+        logging.info("Conexão com TimescaleDB (bulkdata) bem-sucedida.")
 
         # Retornar ambas as conexões
         return connection_geo, connection_bulkdata
     except Exception as e:
-        print(f"Erro ao conectar ao TimescaleDB: {e}")
+        logging.error(f"Erro ao conectar ao TimescaleDB: {e}")
         raise
 
 # Processar e inserir dados no TimescaleDB
@@ -101,10 +111,10 @@ def insert_data_into_timescale(connection, query, data, prefix):
         cursor = connection.cursor()
         cursor.execute(query, data)
         connection.commit()
-        print(f"Dados inseridos: {prefix}:{data}")
+        logging.info(f"Dados inseridos: {prefix}:{data}")
         cursor.close()
     except Exception as e:
-        print(f"Erro ao inserir dados no TimescaleDB: {e}")
+        logging.error(f"Erro ao inserir dados no TimescaleDB: {e}")
         connection.rollback()
  
 def insert_redes_proximas_data(connection, detected_at, device_id, bssid_router, bssid_rede, signal_strength, ssid_rede, channel, channel_bandwidth):
@@ -146,7 +156,7 @@ def process_redis_keys(connection_geo, connection_bulkdata, processed_keys):
         if keys:
             recent_keys = [key for key in keys if redis_client.ttl(key) > 0]
             if recent_keys:
-                print(f"Chaves recentes encontradas no Redis com prefixo {prefix}: {recent_keys}")
+                logging.info(f"Chaves recentes encontradas no Redis com prefixo {prefix}: {recent_keys}")
         for key in keys:
             if key in processed_keys:
                 continue  # Ignorar chaves já processadas
@@ -167,9 +177,9 @@ def process_redis_keys(connection_geo, connection_bulkdata, processed_keys):
 
                 processed_keys.add(key)  # Marcar a chave como processada
             except ValueError as e:
-                print(f"Erro ao processar a chave {key}: {e}")
+                logging.info(f"Erro ao processar a chave {key}: {e}")
             except Exception as e:
-                print(f"Erro inesperado ao processar a chave {key}: {e}")
+                logging.error(f"Erro inesperado ao processar a chave {key}: {e}")
 
 # Função principal
 def main():
@@ -183,7 +193,7 @@ def main():
     except KeyboardInterrupt:
         print("Encerrando o programa.")
     except Exception as e:
-        print(f"Erro no programa principal: {e}")
+        logging.error(f"Erro no programa principal: {e}")
     finally:
         if 'connection_geo' in locals() and connection_geo:
             connection_geo.close()
@@ -192,3 +202,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
