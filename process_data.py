@@ -312,7 +312,7 @@ def dados(item: DeviceData, collection_time: datetime, device_id, records: List[
         "wifi_bytes_received": total_bytes_received2_4 + total_bytes_received5,
         "wifi_packets_sent": total_packets_sent2_4 + total_packets_sent5,
         "wifi_packets_received": total_packets_received2_4 + total_packets_received5,
-        "signal_pon": " ",
+        "signal_pon": -1,
         "wifi2_4_channel": int(wifi2_4.get('Channel', -1)),
         "wifi2_4bandwith": wifi2_4.get('CurrentOperatingChannelBandwidth', 'Unknown'),
         "wifi2_4ssid": radio_network_data.get('1', {}).get('BSS', {}).get('2', {}).get('SSID', 'Unknown'),
