@@ -14,8 +14,16 @@ load_dotenv(dotenv_path='')
 load_dotenv(dotenv_path='')
 
 app = FastAPI()
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+
+# Configuração do logger
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s",
+    handlers=[
+        logging.FileHandler("log/process_data.log"),
+        logging.StreamHandler()
+    ]
+)
 
 REDIS_HOST = os.getenv('REDIS_HOST')
 REDIS_PORT = int(os.getenv('REDIS_PORT'))
@@ -35,9 +43,9 @@ redis_client = redis.Redis(connection_pool=pool)
 
 try:
     redis_client.ping()
-    logger.info("Conexão com Redis bem-sucedida.")
+    logging.info("Conexão com Redis bem-sucedida.")
 except redis.exceptions.ConnectionError as e:
-    logger.error(f"Erro de conexão com Redis: {e}")
+    logging.error(f"Erro de conexão com Redis: {e}")
     raise HTTPException(status_code=500, detail="Conexão com Redis falhou.")
 
 # Modelo Pydantic para validar os dados recebidos
@@ -60,17 +68,17 @@ def safe_get(dictionary: Dict, path: List[str], default=None):
 @app.post("/bulkdata")
 async def receive_bulkdata(request: Request):
     try:
-        print("Recebendo dados...")
+        #print("Recebendo dados...")
         body = await request.json()
-        print(f"Dados recebidos: {body}")
+        logging.info(f"Dados recebidos: {body}")
         data = BulkData(**body)  # Validação automática via Pydantic
         
         nbw_records, wifistats_records, dados_records, routers_records = process_data(data)
         
-        print(f"Registros WiFi_NBW processados: {nbw_records}")
-        print(f"Registros WiFi Stats processados: {wifistats_records}")
-        print(f"Registros de Dados processados: {dados_records}")
-        print(f"Registro de Routers processados: {routers_records}")
+        #print(f"Registros WiFi_NBW processados: {nbw_records}")
+        #print(f"Registros WiFi Stats processados: {wifistats_records}")
+        #print(f"Registros de Dados processados: {dados_records}")
+        #print(f"Registro de Routers processados: {routers_records}")
         
         store_data_in_redis(nbw_records, "redes_proximas", "redes_proximas_stream", ["detected_at", "device_id", "bssid_router", "bssid_rede", "signal_strength", "ssid_rede", "channel", "channel_bandwidth"])
         store_data_in_redis(wifistats_records, "wifistats", "wifistats_stream", ["time", "device_id", "mac_address", "hostname", "signal_strength", "packets_sent", "packets_received", "bytes_sent", "bytes_received", "errors_sent", "errors_received", "radio_connected", "time_since_connected"])
@@ -79,10 +87,10 @@ async def receive_bulkdata(request: Request):
         return {"message": "Dados processados e enviados ao Redis com sucesso."}
 
     except ValidationError as e:
-        print(f"Erro de validação: {e}")
+        logging.error(f"Erro de validação: {e}")
         raise HTTPException(status_code=400, detail=f"Erro de validação: {e}")
     except Exception as e:
-        print(f"Erro no processamento: {e}")
+        logging.error(f"Erro no processamento: {e}")
         raise HTTPException(status_code=500, detail=f"Erro no processamento: {e}")
 
 def process_data(data: BulkData) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
@@ -101,7 +109,7 @@ def process_data(data: BulkData) -> Tuple[List[Dict[str, Any]], List[Dict[str, A
 
     for item in data.Report:
         if not isinstance(item.Device, dict):
-            print(f"Erro: item.Device não é um dicionário: {item.Device}")
+            logging.error(f"Erro: item.Device não é um dicionário: {item.Device}")
             continue
         
         collection_time = datetime.fromtimestamp(item.CollectionTime, timezone.utc)
@@ -132,7 +140,7 @@ def process_neighboring_wifi(item: DeviceData, collection_time: datetime, device
     bssid_router5 = safe_get(item.Device, ["WiFi", "DataElements", "Network", "Device", "1", "Radio", "2", "BSS", "2", "BSSID"], "Unknown5").upper()
     
     if not isinstance(neighboring_wifi, dict):
-        print(f"neighboring_wifi is not a dictionary: {neighboring_wifi}")
+        logging.error(f"neighboring_wifi is not a dictionary: {neighboring_wifi}")
         return records
 
     for bssid, details in neighboring_wifi.items():
@@ -153,9 +161,9 @@ def process_neighboring_wifi(item: DeviceData, collection_time: datetime, device
                 "channel_bandwidth": channel_bandwidth
             }
             records.append(record)
-            print(f"WiFi Neighboring Processado: {record}")
+            #print(f"WiFi Neighboring Processado: {record}")
         except (ValueError, TypeError) as e:
-            print(f"Erro ao processar Neighboring WiFi para {bssid}: {e}")
+            logging.error(f"Erro ao processar Neighboring WiFi para {bssid}: {e}")
     return records
 
 def process_wifi_stats(item, collection_time, device_id, records):
@@ -192,7 +200,7 @@ def process_wifi_stats(item, collection_time, device_id, records):
                     "time_since_connected": ad2_4.get('LastConnectTime', '0')
                 }
                 records.append(record)
-                print(f"WiFi Stats Processado: {record}")
+                #print(f"WiFi Stats Processado: {record}")
 
         for ad5 in AD5GHz_data.values():
             mac_address5 = ad5.get('MACAddress', '0')
@@ -213,7 +221,7 @@ def process_wifi_stats(item, collection_time, device_id, records):
                     "time_since_connected": ad5.get('LastConnectTime', '0')
                 }
                 records.append(record)
-                print(f"WiFi Stats Processado: {record}")
+                #print(f"WiFi Stats Processado: {record}")
 
     return records
 
@@ -304,7 +312,7 @@ def dados(item: DeviceData, collection_time: datetime, device_id, records: List[
         "wifi_bytes_received": total_bytes_received2_4 + total_bytes_received5,
         "wifi_packets_sent": total_packets_sent2_4 + total_packets_sent5,
         "wifi_packets_received": total_packets_received2_4 + total_packets_received5,
-        "signal_pon": -1,
+        "signal_pon": " ",
         "wifi2_4_channel": int(wifi2_4.get('Channel', -1)),
         "wifi2_4bandwith": wifi2_4.get('CurrentOperatingChannelBandwidth', 'Unknown'),
         "wifi2_4ssid": radio_network_data.get('1', {}).get('BSS', {}).get('2', {}).get('SSID', 'Unknown'),
@@ -318,7 +326,7 @@ def dados(item: DeviceData, collection_time: datetime, device_id, records: List[
     critical_fields = ["wan_bytes_sent", "lan_bytes_sent"]
     if all(record[field] != -1 for field in critical_fields):
         records.append(record)
-        print(f"Dados Processados: {record}")
+        #print(f"Dados Processados: {record}")
     else:
         print("Registro ignorado devido a valores críticos ausentes.")
 
@@ -330,11 +338,11 @@ def store_data_in_redis(records: List[Dict[str, Any]], redis_key_prefix: str, re
             # Converte valores None para string 'null' antes de armazenar
             record = {key: (str(value) if value is not None else '-1') for key, value in record.items()}
             redis_key = f"{redis_key_prefix};{';'.join(record.get(field, 'missing') for field in key_fields)}"
-            print(f"Armazenando no Redis com chave: {redis_key} e dados: {record}")
+            logging.info(f"Armazenando no Redis com chave: {redis_key} e dados: {record}")
             redis_client.hset(redis_key, mapping=record)
             redis_client.xadd(redis_stream, record)
         except Exception as e:
-            print(f"Erro ao armazenar registro no Redis: {e}")
+            logging.error(f"Erro ao armazenar registro no Redis: {e}")
 
 if __name__ == "__main__":
     uvicorn.run(app, host=os.getenv('UVICORN_HOST'), port=int(os.getenv('UVICORN_PORT')))
