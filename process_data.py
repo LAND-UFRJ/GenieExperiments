@@ -13,12 +13,10 @@ from dotenv import load_dotenv
 load_dotenv(dotenv_path='')
 load_dotenv(dotenv_path='')
 
-app = FastAPI()
-
 # Configuração do logger
 logging.basicConfig(
     level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(message)s",
+    format="[%(levelname)s] %(asctime)s %(message)s",
     handlers=[
         logging.FileHandler("log/process_data.log"),
         logging.StreamHandler()
