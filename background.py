@@ -11,13 +11,12 @@ load_dotenv(dotenv_path='')
 # Configuração do logger
 logging.basicConfig(
     level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(message)s",
+    format="[%(levelname)s] %(asctime)s %(message)s",
     handlers=[
-        logging.FileHandler("log/background.log"),
+        logging.FileHandler("log/process_data.log"),
         logging.StreamHandler()
     ]
 )
-
 
 # Create a Connection object to interact with a GenieACS server
 acs = genieacs.Connection(
@@ -128,3 +127,4 @@ try:
         time.sleep(1)
 except KeyboardInterrupt:
     logging.info("Programa interrompido.")
+
