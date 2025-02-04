@@ -8,6 +8,16 @@ import schedule
 # Loading .env file
 load_dotenv(dotenv_path='')
 
+# Configuração do logger
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s",
+    handlers=[
+        logging.FileHandler("log/background.log"),
+        logging.StreamHandler()
+    ]
+)
+
 
 # Create a Connection object to interact with a GenieACS server
 acs = genieacs.Connection(
@@ -25,10 +35,10 @@ def fetch_devices():
     global devices
     new_devices = acs.device_get_all_IDs()  # Obtém todos os dispositivos disponíveis
     if new_devices != devices:
-        print("Dispositivos atualizados:", new_devices)
+        logging.info("Dispositivos atualizados: %s", new_devices)
         devices = new_devices  # Atualiza a lista de dispositivos
     else:
-        print("Nenhuma mudança nos dispositivos.")
+        logging.info("Nenhuma mudança nos dispositivos.")
 
 # Agenda a função fetch_devices para ser executada a cada 20 minutos
 schedule.every(20).minutes.do(fetch_devices)
@@ -41,20 +51,6 @@ def run_scheduler():
     while True:
         schedule.run_pending()
         time.sleep(1)
-
-scheduler_thread = Thread(target=run_scheduler)
-scheduler_thread.daemon = True
-scheduler_thread.start()
-
-# Função para processar um dispositivo
-def set_neighboring(device):
-    z = 0
-    while True:
-        acs.task_set_parameter_values(device, [["Device.WiFi.NeighboringWiFiDiagnostic.DiagnosticsState", "Requested"]])
-        acs.task_refresh_object(device, "Device.WiFi.NeighboringWiFiDiagnostic")
-        z += 1
-        print(f"Set NeighBoring to Requested | Device: {device} | Iteração: {z} | Horário: {time.strftime('%Y-%m-%d %H:%M:%S')}")
-        time.sleep(360)
 
 # Função para gerenciar o ThreadPoolExecutor com base na lista atualizada de dispositivos
 def manage_device_processing():
@@ -73,15 +69,25 @@ def manage_device_processing():
                 [executor.submit(set_neighboring, device) for device in current_devices] +
                 [executor.submit(check_variable, device) for device in current_devices]
             )
-        time.sleep(300)  # Verifica a cada minuto se a lista de dispositivos mudou
+        time.sleep(300)  # Verifica a cada 5 minutos se a lista de dispositivos mudou
+
+# Função para processar um dispositivo
+def set_neighboring(device):
+    z = 0
+    while True:
+        acs.task_set_parameter_values(device, [["Device.WiFi.NeighboringWiFiDiagnostic.DiagnosticsState", "Requested"]])
+        acs.task_refresh_object(device, "Device.WiFi.NeighboringWiFiDiagnostic")
+        z += 1
+        logging.info("Set NeighBoring to Requested | Device: %s | Iteração: %s | Horário: %s", device, z, time.strftime('%Y-%m-%d %H:%M:%S'))
+        time.sleep(360)
 
 # Função para verificar a variável a cada hora
 def check_variable(device):
     acs.task_refresh_object(device, "Device.DeviceInfo.UpTime")
     while True:
         uptime = acs.device_get_parameter(device, "Device.DeviceInfo.UpTime")
-        if uptime < 3600:
-            print(f"Reboot | Device: {device} | Uptime: {uptime} | Horário: {time.strftime('%Y-%m-%d %H:%M:%S')}")
+        if uptime < 3601:
+            logging.info("Reboot | Device: %s | Uptime: %s | Horário: %s", device, uptime, time.strftime('%Y-%m-%d %H:%M:%S'))
             for idx in range(1, 9):
                 profile_name = acs.device_get_parameter(device, f"Device.BulkData.Profile.{idx}.Name")
                 if profile_name == 'NeighboringWiFi':
@@ -91,28 +97,19 @@ def check_variable(device):
                     profile = idx
                     interval = 60
                 else:
-                    print(f"Nenhum profile atualizado para {device}.")
+                    logging.info("Nenhum profile atualizado para %s.", device)
                     continue
                 config = [
-                    {
-                        'name_path': f"Device.BulkData.Profile.{profile}.Enable",
-                        'name_value': "true"
-                    },
-                    {
-                        'name_path': f"Device.BulkData.Profile.{profile}.ReportingInterval",
-                        'name_value': f"{interval}"
-                    },
-                    {
-                        'name_path': f"Device.BulkData.Profile.{profile}.X_TP_CollectInterval",
-                        'name_value': f"{interval}"
-                    }
+                    {'name_path': f"Device.BulkData.Profile.{profile}.Enable", 'name_value': "true"},
+                    {'name_path': f"Device.BulkData.Profile.{profile}.ReportingInterval", 'name_value': f"{interval}"},
+                    {'name_path': f"Device.BulkData.Profile.{profile}.X_TP_CollectInterval", 'name_value': f"{interval}"}
                 ]
                 formatted_list = [[item['name_path'], item['name_value']] for item in config]
                 for parameter in formatted_list:
                     acs.task_set_parameter_values(device, [parameter])
-                    print(f"Sucesso! {parameter[0]} configurado no profile {profile} do dispositivo {device}.")
+                    logging.info("Sucesso! %s configurado no profile %s do dispositivo %s.", parameter[0], profile, device)
         else:
-            print(f"No Reboot | Device: {device} | Uptime: {uptime} | Horário: {time.strftime('%Y-%m-%d %H:%M:%S')}")
+            logging.info("No Reboot | Device: %s | Uptime: %s | Horário: %s", device, uptime, time.strftime('%Y-%m-%d %H:%M:%S'))
         time.sleep(3600)
 
 # Inicia o gerenciador de processamento de dispositivos em uma thread separada
@@ -120,11 +117,14 @@ device_manager_thread = Thread(target=manage_device_processing)
 device_manager_thread.daemon = True
 device_manager_thread.start()
 
+# Inicia o agendador em uma thread separada
+scheduler_thread = Thread(target=run_scheduler)
+scheduler_thread.daemon = True
+scheduler_thread.start()
 
 # Mantém o programa principal em execução
 try:
     while True:
         time.sleep(1)
 except KeyboardInterrupt:
-    print("Programa interrompido.")
- 
+    logging.info("Programa interrompido.")
