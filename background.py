@@ -15,7 +15,7 @@ logging.basicConfig(
     level=logging.INFO,
     format="[%(levelname)s] %(asctime)s %(message)s",
     handlers=[
-        logging.FileHandler("log/process_data.log"),
+        #logging.FileHandler("log/process_data.log"),
         logging.StreamHandler()
     ]
 )
@@ -84,21 +84,22 @@ def set_neighboring(device):
 
 # Função para verificar a variável a cada hora
 def check_variable(device):
-    acs.task_refresh_object(device, "Device.DeviceInfo.UpTime")
     while True:
+        acs.task_refresh_object(device, "Device.DeviceInfo.UpTime")
+        time.sleep(10)
         uptime = acs.device_get_parameter(device, "Device.DeviceInfo.UpTime")
         if uptime < 3601:
             logging.info("Reboot | Device: %s | Uptime: %s | Horário: %s", device, uptime, time.strftime('%Y-%m-%d %H:%M:%S'))
             for idx in range(1, 9):
                 profile_name = acs.device_get_parameter(device, f"Device.BulkData.Profile.{idx}.Name")
-                if profile_name == 'NeighboringWiFi':
+                if profile_name.lower() == 'neighboringwifi':
                     profile = idx
                     interval = 1800
-                elif profile_name == 'Dispositivos Conectados & Dados':
+                elif profile_name.lower() == 'dispositivosconectados&dados':
                     profile = idx
                     interval = 60
                 else:
-                    logging.info("Nenhum profile atualizado para %s.", device)
+                    logging.info("profile %s não atualizado para %s.", idx, device)
                     continue
                 config = [
                     {'name_path': f"Device.BulkData.Profile.{profile}.Enable", 'name_value': "true"},
@@ -129,4 +130,3 @@ try:
         time.sleep(1)
 except KeyboardInterrupt:
     logging.info("Programa interrompido.")
-
