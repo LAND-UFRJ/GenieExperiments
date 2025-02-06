@@ -13,6 +13,9 @@ from dotenv import load_dotenv
 load_dotenv(dotenv_path='')
 load_dotenv(dotenv_path='')
 
+# Inicialização do FastAPI
+app = FastAPI()
+
 # Configuração do logger
 logging.basicConfig(
     level=logging.INFO,
@@ -63,7 +66,7 @@ def safe_get(dictionary: Dict, path: List[str], default=None):
     return dictionary
 
 # Processamento dos dados
-@app.post("/bulkdata")
+@app.post("/bulkdata") # type: ignore
 async def receive_bulkdata(request: Request):
     try:
         #print("Recebendo dados...")
@@ -80,7 +83,7 @@ async def receive_bulkdata(request: Request):
         
         store_data_in_redis(nbw_records, "redes_proximas", "redes_proximas_stream", ["detected_at", "device_id", "bssid_router", "bssid_rede", "signal_strength", "ssid_rede", "channel", "channel_bandwidth"])
         store_data_in_redis(wifistats_records, "wifistats", "wifistats_stream", ["time", "device_id", "mac_address", "hostname", "signal_strength", "packets_sent", "packets_received", "bytes_sent", "bytes_received", "errors_sent", "errors_received", "radio_connected", "time_since_connected"])
-        store_data_in_redis(dados_records, "dados", "dados_stream", ["time", "device_id", "wan_bytes_sent", "wan_bytes_received", "wan_packets_sent", "wan_packets_received", "lan_bytes_sent", "lan_bytes_received", "lan_packets_sent", "lan_packets_received", "wifi_bytes_sent", "wifi_bytes_received", "wifi_packets_sent", "wifi_packets_received", "signal_pon", "wifi2_4_channel", "wifi2_4bandwith", "wifi2_4ssid", "wifi_5_channel", "wifi_5_bandwith", "wifi_5_ssid", "uptime"])
+        store_data_in_redis(dados_records, "dados", "dados_stream", ["time", "device_id", "wan_bytes_sent", "wan_bytes_received", "wan_packets_sent", "wan_packets_received", "lan_bytes_sent", "lan_bytes_received", "lan_packets_sent", "lan_packets_received", "wifi_bytes_sent", "wifi_bytes_received", "wifi_packets_sent", "wifi_packets_received", "signal_pon", "wifi2_4_channel", "wifi2_4bandwith", "wifi2_4ssid", "wifi_5_channel", "wifi_5_bandwith", "wifi_5_ssid", "uptime", "memory_free", "memory_total", "cpu_usage"])
         #store_data_in_redis(routers_records, "routers", "routers_stream", ["device_id", "latitude", "longitude", "ssid", "mac_address"])
         return {"message": "Dados processados e enviados ao Redis com sucesso."}
 
@@ -317,7 +320,10 @@ def dados(item: DeviceData, collection_time: datetime, device_id, records: List[
         "wifi_5_channel": int(wifi5.get('Channel', -1)),
         "wifi_5_bandwith": wifi5.get('CurrentOperatingChannelBandwidth', 'Unknown'),
         "wifi_5_ssid": radio_network_data.get('2', {}).get('BSS', {}).get('2', {}).get('SSID', 'Unknown'),
-        "uptime": int(item.Device.get('DeviceInfo', {}).get('UpTime', -1))
+        "uptime": int(item.Device.get('DeviceInfo', {}).get('UpTime', -1)),
+        "memory_free": int(item.Device.get('DeviceInfo', {}).get('MemoryStatus', {}).get('Free', -1)),
+        "memory_total": int(item.Device.get('DeviceInfo', {}).get('MemoryStatus', {}).get('Total', -1)),
+        "cpu_usage": int(item.Device.get('DeviceInfo', {}).get('ProcessStatus').get('CPUUsage', -1))
     }
 
     # Verificação de campos críticos
