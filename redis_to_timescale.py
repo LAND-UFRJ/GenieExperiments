@@ -4,6 +4,7 @@ import psycopg2
 from psycopg2 import sql
 import os
 from dotenv import load_dotenv
+import logging
 
 # Carregar variáveis de ambiente do arquivo .env
 load_dotenv(dotenv_path='')
