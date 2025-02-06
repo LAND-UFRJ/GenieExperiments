@@ -66,13 +66,10 @@ def dispositivos_conectados(device, profile, i):
         {'name_value': "Time_since_connected", 'reference_value': "Device.WiFi.DataElements.Network.Device.1.Radio.*.BSS.2.STA.*.LastConnectTime"}
     ]
 
-    # Filtra parâmetros únicos
     unique_parameters = avoid_duplicate_parameters(device, profile, parameter_set)
     
-    # Escreve os parâmetros únicos
     current_index = i  # Índice inicial
     for param in unique_parameters:
-        # Gera os paths dinamicamente
         parameter_name_path = f"Device.BulkData.Profile.{profile}.Parameter.{current_index}.Name"
         parameter_reference_path = f"Device.BulkData.Profile.{profile}.Parameter.{current_index}.Reference"
         
@@ -82,27 +79,7 @@ def dispositivos_conectados(device, profile, i):
         ])
         print(f"Sucesso! {param['name_value']} configurado no profile {profile} do dispositivo {device}.")
         
-        # Incrementa o índice apenas para parâmetros escritos
-        current_index += 1
-
-    existing_parameters = avoid_duplicate_parameters(device, profile, parameter_set)
-    
-    current_index = i  # Usar para ajustar os índices dinamicamente
-    for param in parameter_set:
-        if (param['name_value'], param['reference_value']) not in existing_parameters:
-            # Configura o parâmetro com índice atualizado
-            parameter_name_path = f"Device.BulkData.Profile.{profile}.Parameter.{current_index}.Name"
-            parameter_reference_path = f"Device.BulkData.Profile.{profile}.Parameter.{current_index}.Reference"
-            
-            acs.task_set_parameter_values(device, [
-                [parameter_name_path, param['name_value']],
-                [parameter_reference_path, param['reference_value']]
-            ])
-            print(f"Sucesso! {param['name_value']} configurado no profile {profile} do dispositivo {device}.")
-            
-            current_index += 1  # Atualiza o índice apenas para parâmetros configurados
-        else:
-            print(f"Parâmetro duplicado {param['name_value']} ({param['reference_value']}) detectado e ignorado.")
+        current_index += 1  # Incrementa o índice apenas para parâmetros escritos
 
 def neighboring_wifi_config(device, profile, i):
     parameter_set = [
@@ -149,7 +126,11 @@ def dados(device, profile, i):
         {'name_value': "Packets Received WiFi 2.4GHz/5GHz", 'reference_value': "Device.WiFi.Radio.*.Stats.PacketsReceived"},
         {'name_value': "WiFi Channel 2.4GHz/5GHz", 'reference_value': "Device.WiFi.Radio.*.Channel"},
         {'name_value': "Current Channel Bandwidth 2.4GHz/5GHz", 'reference_value': "Device.WiFi.Radio.*.CurrentOperatingChannelBandwidth"},
-        {'name_value': "WiFi SSID 2.4GHz/5GHz", 'reference_value': "Device.WiFi.DataElements.Network.Device.1.Radio.*.BSS.2.SSID"}
+        {'name_value': "WiFi SSID 2.4GHz/5GHz", 'reference_value': "Device.WiFi.DataElements.Network.Device.1.Radio.*.BSS.2.SSID"},
+        {'name_value': "Memory Free", 'reference_value': "Device.DeviceInfo.MemoryStatus.Free"},
+        {'name_value': "Memory Total", 'reference_value': "Device.DeviceInfo.MemoryStatus.Total"},
+        {'name_value': "CPU Usage", 'reference_value': "Device.DeviceInfo.ProcessStatus.CPUUsage"},
+
     ]
     
     # Filtra parâmetros únicos
@@ -166,7 +147,7 @@ def dados(device, profile, i):
             [parameter_name_path, param['name_value']],
             [parameter_reference_path, param['reference_value']]
         ])
-        print(f"Sucesso! {param['name_value']} configurado no profile {profile} do dispositivo {device}.")
+        print(f"Sucesso! {param['name_value']} configurado no profile {profile} do dispositivo {device} no parameter {current_index}.")
         
         # Incrementa o índice apenas para parâmetros escritos
         current_index += 1
@@ -260,7 +241,7 @@ def avoid_duplicate_parameters(device, profile, parameter_set):
 
 def clear_bulkdata(device, profile):
     #config_profile(device, profile, "", "", "", "", 60, "", "" )
-    acs.task_set_parameter_values(device, [[f"Device.BulkData.Profile.{profile}.Enable", "false"]])
+    #acs.task_set_parameter_values(device, [[f"Device.BulkData.Profile.{profile}.Enable", "false"]])
     print(f"BulkData disabled for profile {profile}.")
     for idx in range(1, 108):
         #if not acs.device_get_parameter(device, f"Device.BulkData.Profile.{profile}.Parameter.{idx}.Name"):
@@ -290,7 +271,7 @@ selected_profile = select_profile(selected_device)
 #neighboring_wifi_config(selected_device, selected_profile[0], first_empty_parameter(selected_device, selected_profile[0]))
 #acs.task_refresh_object(selected_device, "Device.BulkData")
 
-#dispositivos_conectados('98254A-Device2-223C1S5004290', selected_profile[0], first_empty_parameter(selected_device, selected_profile[0]))
+#dispositivos_conectados(selected_device, selected_profile[0], first_empty_parameter(selected_device, selected_profile[0]))
 
 #clear_bulkdata(selected_device, selected_profile[0])
 
