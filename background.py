@@ -4,6 +4,7 @@ from concurrent.futures import ThreadPoolExecutor
 import os
 from dotenv import load_dotenv
 import schedule
+import logging
 
 # Loading .env file
 load_dotenv(dotenv_path='')
