@@ -5,6 +5,7 @@ import os
 from dotenv import load_dotenv
 import schedule
 import logging
+from threading import Thread
 
 # Loading .env file
 load_dotenv(dotenv_path='')
