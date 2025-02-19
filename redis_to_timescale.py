@@ -1,7 +1,7 @@
 import time
 import redis
 import psycopg2
-from psycopg2 import sql
+from psycopg2 import sql, OperationalError
 import os
 from dotenv import load_dotenv
 import logging
