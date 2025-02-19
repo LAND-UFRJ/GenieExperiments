@@ -77,43 +77,58 @@ save_redis_data_to_file()
 redis_client.flushall()
 print("Memória do Redis limpa.")
 
-# Conectar ao TimescaleDB
+# Conectar ao TimescaleDB com retentativas
 def connect_to_timescale():
-    try:
-        # Conexão ao primeiro banco de dados
-        connection_geo = psycopg2.connect(
-            host=PG_HOST,
-            port=PG_PORT,
-            dbname=PG_DB_geo, 
-            user=PG_USER,
-            password=PG_PASSWORD
-        )
-        logging.info("Conexão com TimescaleDB (geo) bem-sucedida.")
+    max_retries = 1000 # Número máximo de tentativas
+    retry_delay = 30  # Segundos entre tentativas
 
-        # Conexão ao segundo banco de dados
-        connection_bulkdata = psycopg2.connect(
-            host=PG_HOST,
-            port=PG_PORT,
-            dbname=PG_DB_bulk, 
-            user=PG_USER,
-            password=PG_PASSWORD
-        )
-        logging.info("Conexão com TimescaleDB (bulkdata) bem-sucedida.")
+    for attempt in range(max_retries):
+        try:
+            # Conexão ao primeiro banco de dados
+            connection_geo = psycopg2.connect(
+                host=PG_HOST,
+                port=PG_PORT,
+                dbname=PG_DB_geo,
+                user=PG_USER,
+                password=PG_PASSWORD
+            )
+            # Conexão ao segundo banco de dados
+            connection_bulkdata = psycopg2.connect(
+                host=PG_HOST,
+                port=PG_PORT,
+                dbname=PG_DB_bulk,
+                user=PG_USER,
+                password=PG_PASSWORD
+            )
+            logging.info("Conexões com TimescaleDB bem-sucedidas.")
+            return connection_geo, connection_bulkdata
+        except Exception as e:
+            logging.error(f"Erro ao conectar ao TimescaleDB (tentativa {attempt + 1}/{max_retries}): {e}")
+            if attempt < max_retries - 1:
+                time.sleep(retry_delay)
+            else:
+                raise  # Se todas as tentativas falharem, propaga o erro
 
-        # Retornar ambas as conexões
-        return connection_geo, connection_bulkdata
-    except Exception as e:
-        logging.error(f"Erro ao conectar ao TimescaleDB: {e}")
-        raise
-
-# Processar e inserir dados no TimescaleDB
+# Processar e inserir dados no TimescaleDB (com verificação de conexão)
 def insert_data_into_timescale(connection, query, data, prefix):
     try:
+        # Verifica se a conexão está fechada
+        if connection.closed:
+            logging.error("Conexão fechada. Uma reconexão será feita no próximo ciclo.")
+            raise OperationalError("Conexão fechada.")
+
         cursor = connection.cursor()
         cursor.execute(query, data)
         connection.commit()
         logging.info(f"Dados inseridos: {prefix}:{data}")
         cursor.close()
+    except OperationalError as e:
+        if "SSL connection has been closed unexpectedly" in str(e):
+            logging.error("Erro de SSL. A conexão será reiniciada.")
+            connection.close()  # Fecha a conexão corrompida
+        else:
+            logging.error(f"Erro operacional ao inserir dados: {e}")
+        connection.rollback()
     except Exception as e:
         logging.error(f"Erro ao inserir dados no TimescaleDB: {e}")
         connection.rollback()
@@ -182,24 +197,43 @@ def process_redis_keys(connection_geo, connection_bulkdata, processed_keys):
             except Exception as e:
                 logging.error(f"Erro inesperado ao processar a chave {key}: {e}")
 
-# Função principal
+# Função principal com lógica de reconexão
 def main():
-    try:
-        connection_geo, connection_bulkdata = connect_to_timescale()
-        processed_keys = set()  # Rastrear chaves já processadas
-        
-        while True:
-            process_redis_keys(connection_geo, connection_bulkdata, processed_keys)
-            time.sleep(5)  # Aguardar 5 segundos antes de verificar novamente
-    except KeyboardInterrupt:
-        print("Encerrando o programa.")
-    except Exception as e:
-        logging.error(f"Erro no programa principal: {e}")
-    finally:
-        if 'connection_geo' in locals() and connection_geo:
-            connection_geo.close()
-        if 'connection_bulkdata' in locals() and connection_bulkdata:
-            connection_bulkdata.close()
+    processed_keys = set()
+    connection_geo = None
+    connection_bulkdata = None
+
+    while True:  # Loop externo para reconexão
+        try:
+            # Conectar ao TimescaleDB
+            connection_geo, connection_bulkdata = connect_to_timescale()
+
+            # Loop interno para processamento contínuo
+            while True:
+                # Verifica se as conexões estão ativas
+                if connection_geo.closed or connection_bulkdata.closed:
+                    logging.error("Conexões perdidas. Reconectando...")
+                    break  # Sai do loop interno para reconectar
+
+                # Processa as chaves do Redis
+                process_redis_keys(connection_geo, connection_bulkdata, processed_keys)
+                time.sleep(5)
+
+        except OperationalError as e:
+            logging.error(f"Erro de conexão: {e}. Tentando reconectar em 5 segundos...")
+            time.sleep(5)
+        except KeyboardInterrupt:
+            logging.info("Encerrando o programa.")
+            break
+        except Exception as e:
+            logging.error(f"Erro inesperado: {e}. Tentando reconectar em 5 segundos...")
+            time.sleep(5)
+        finally:
+            # Fecha as conexões ao sair ou em caso de erro
+            if connection_geo and not connection_geo.closed:
+                connection_geo.close()
+            if connection_bulkdata and not connection_bulkdata.closed:
+                connection_bulkdata.close()
 
 if __name__ == "__main__":
     main()
