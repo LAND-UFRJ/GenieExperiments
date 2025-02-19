@@ -4,10 +4,21 @@ import psycopg2
 from psycopg2 import sql
 import os
 from dotenv import load_dotenv
+import logging
 
 # Carregar variáveis de ambiente do arquivo .env
 load_dotenv(dotenv_path='')
 load_dotenv(dotenv_path='')
+
+# Configuração do logger
+logging.basicConfig(
+    level=logging.INFO,
+    format="[%(levelname)s] %(asctime)s %(message)s",
+    handlers=[
+        logging.FileHandler("log/redis_to_timescaled.log"),
+        logging.StreamHandler()
+    ]
+)
 
 # Configurações do Redis
 REDIS_HOST = os.getenv('REDIS_HOST')
@@ -66,45 +77,60 @@ save_redis_data_to_file()
 redis_client.flushall()
 print("Memória do Redis limpa.")
 
-# Conectar ao TimescaleDB
+# Conectar ao TimescaleDB com retentativas
 def connect_to_timescale():
-    try:
-        # Conexão ao primeiro banco de dados
-        connection_geo = psycopg2.connect(
-            host=PG_HOST,
-            port=PG_PORT,
-            dbname=PG_DB_geo, 
-            user=PG_USER,
-            password=PG_PASSWORD
-        )
-        print("Conexão com TimescaleDB (geo) bem-sucedida.")
+    max_retries = 1000 # Número máximo de tentativas
+    retry_delay = 30  # Segundos entre tentativas
 
-        # Conexão ao segundo banco de dados
-        connection_bulkdata = psycopg2.connect(
-            host=PG_HOST,
-            port=PG_PORT,
-            dbname=PG_DB_bulk, 
-            user=PG_USER,
-            password=PG_PASSWORD
-        )
-        print("Conexão com TimescaleDB (bulkdata) bem-sucedida.")
+    for attempt in range(max_retries):
+        try:
+            # Conexão ao primeiro banco de dados
+            connection_geo = psycopg2.connect(
+                host=PG_HOST,
+                port=PG_PORT,
+                dbname=PG_DB_geo,
+                user=PG_USER,
+                password=PG_PASSWORD
+            )
+            # Conexão ao segundo banco de dados
+            connection_bulkdata = psycopg2.connect(
+                host=PG_HOST,
+                port=PG_PORT,
+                dbname=PG_DB_bulk,
+                user=PG_USER,
+                password=PG_PASSWORD
+            )
+            logging.info("Conexões com TimescaleDB bem-sucedidas.")
+            return connection_geo, connection_bulkdata
+        except Exception as e:
+            logging.error(f"Erro ao conectar ao TimescaleDB (tentativa {attempt + 1}/{max_retries}): {e}")
+            if attempt < max_retries - 1:
+                time.sleep(retry_delay)
+            else:
+                raise  # Se todas as tentativas falharem, propaga o erro
 
-        # Retornar ambas as conexões
-        return connection_geo, connection_bulkdata
-    except Exception as e:
-        print(f"Erro ao conectar ao TimescaleDB: {e}")
-        raise
-
-# Processar e inserir dados no TimescaleDB
+# Processar e inserir dados no TimescaleDB (com verificação de conexão)
 def insert_data_into_timescale(connection, query, data, prefix):
     try:
+        # Verifica se a conexão está fechada
+        if connection.closed:
+            logging.error("Conexão fechada. Uma reconexão será feita no próximo ciclo.")
+            raise OperationalError("Conexão fechada.")
+
         cursor = connection.cursor()
         cursor.execute(query, data)
         connection.commit()
-        print(f"Dados inseridos: {prefix}:{data}")
+        logging.info(f"Dados inseridos: {prefix}:{data}")
         cursor.close()
+    except OperationalError as e:
+        if "SSL connection has been closed unexpectedly" in str(e):
+            logging.error("Erro de SSL. A conexão será reiniciada.")
+            connection.close()  # Fecha a conexão corrompida
+        else:
+            logging.error(f"Erro operacional ao inserir dados: {e}")
+        connection.rollback()
     except Exception as e:
-        print(f"Erro ao inserir dados no TimescaleDB: {e}")
+        logging.error(f"Erro ao inserir dados no TimescaleDB: {e}")
         connection.rollback()
  
 def insert_redes_proximas_data(connection, detected_at, device_id, bssid_router, bssid_rede, signal_strength, ssid_rede, channel, channel_bandwidth):
@@ -123,12 +149,12 @@ def insert_wifi_data(connection, time, device_id, mac_address, hostname, signal_
     data = (time, device_id, mac_address, hostname, signal_strength, packets_sent, packets_received, bytes_sent, bytes_received, errors_sent, errors_received, radio_connected, time_since_connected)
     insert_data_into_timescale(connection, query, data, 'wifi_stats')
 
-def insert_dados(connection, time, device_id, wan_bytes_sent, wan_bytes_received, wan_packets_sent, wan_packets_received, lan_bytes_sent, lan_bytes_received, lan_packets_sent, lan_packets_received, wifi_bytes_sent, wifi_bytes_received, wifi_packets_sent, wifi_packets_received, signal_pon, wifi2_4channel, wifi2_4bandwith, wifi2_4ssid, wifi_5_channel, wifi_5_bandwith, wifi_5_ssid, uptime):
+def insert_dados(connection, time, device_id, wan_bytes_sent, wan_bytes_received, wan_packets_sent, wan_packets_received, lan_bytes_sent, lan_bytes_received, lan_packets_sent, lan_packets_received, wifi_bytes_sent, wifi_bytes_received, wifi_packets_sent, wifi_packets_received, signal_pon, wifi2_4channel, wifi2_4bandwith, wifi2_4ssid, wifi_5_channel, wifi_5_bandwith, wifi_5_ssid, uptime, memory_free, memory_total, cpu_usage):
     query = sql.SQL("""
-        INSERT INTO dados (time, device_id, wan_bytes_sent, wan_bytes_received, wan_packets_sent, wan_packets_received, lan_bytes_sent, lan_bytes_received, lan_packets_sent, lan_packets_received, wifi_bytes_sent, wifi_bytes_received, wifi_packets_sent, wifi_packets_received, signal_pon, wifi2_4channel, wifi2_4bandwith, wifi2_4ssid, wifi_5_channel, wifi_5_bandwith, wifi_5_ssid, uptime)
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        INSERT INTO dados (time, device_id, wan_bytes_sent, wan_bytes_received, wan_packets_sent, wan_packets_received, lan_bytes_sent, lan_bytes_received, lan_packets_sent, lan_packets_received, wifi_bytes_sent, wifi_bytes_received, wifi_packets_sent, wifi_packets_received, signal_pon, wifi2_4channel, wifi2_4bandwith, wifi2_4ssid, wifi_5_channel, wifi_5_bandwith, wifi_5_ssid, uptime, memory_free, memory_total, cpu_usage)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
     """)
-    data = (time, device_id, wan_bytes_sent, wan_bytes_received, wan_packets_sent, wan_packets_received, lan_bytes_sent, lan_bytes_received, lan_packets_sent, lan_packets_received, wifi_bytes_sent, wifi_bytes_received, wifi_packets_sent, wifi_packets_received, signal_pon, wifi2_4channel, wifi2_4bandwith, wifi2_4ssid, wifi_5_channel, wifi_5_bandwith, wifi_5_ssid, uptime)
+    data = (time, device_id, wan_bytes_sent, wan_bytes_received, wan_packets_sent, wan_packets_received, lan_bytes_sent, lan_bytes_received, lan_packets_sent, lan_packets_received, wifi_bytes_sent, wifi_bytes_received, wifi_packets_sent, wifi_packets_received, signal_pon, wifi2_4channel, wifi2_4bandwith, wifi2_4ssid, wifi_5_channel, wifi_5_bandwith, wifi_5_ssid, uptime, memory_free, memory_total, cpu_usage)
     insert_data_into_timescale(connection, query, data, 'dados')
 
 def insert_routers(connection, device_id, latitude, longitude, ssid, mac_address):
@@ -146,7 +172,7 @@ def process_redis_keys(connection_geo, connection_bulkdata, processed_keys):
         if keys:
             recent_keys = [key for key in keys if redis_client.ttl(key) > 0]
             if recent_keys:
-                print(f"Chaves recentes encontradas no Redis com prefixo {prefix}: {recent_keys}")
+                logging.info(f"Chaves recentes encontradas no Redis com prefixo {prefix}: {recent_keys}")
         for key in keys:
             if key in processed_keys:
                 continue  # Ignorar chaves já processadas
@@ -158,37 +184,57 @@ def process_redis_keys(connection_geo, connection_bulkdata, processed_keys):
                 elif prefix == 'wifistats;':
                     _, time, device_id, mac_address, hostname, signal_strength, packets_sent, packets_received, bytes_sent, bytes_received, errors_sent, errors_received, radio_connected, time_since_connected = key.split(";")
                     insert_wifi_data(connection_bulkdata, time, device_id, mac_address, hostname, signal_strength, packets_sent, packets_received, bytes_sent, bytes_received, errors_sent, errors_received, radio_connected, time_since_connected)
-                elif prefix == 'dados;' :
-                    _, time, device_id, wan_bytes_sent, wan_bytes_received, wan_packets_sent, wan_packets_received, lan_bytes_sent, lan_bytes_received, lan_packets_sent, lan_packets_received, wifi_bytes_sent, wifi_bytes_received, wifi_packets_sent, wifi_packets_received, signal_pon, wifi2_4_channel, wifi2_4bandwith, wifi2_4ssid, wifi_5_channel, wifi_5_bandwith, wifi_5_ssid, uptime = key.split(";")
-                    insert_dados(connection_bulkdata, time, device_id, wan_bytes_sent, wan_bytes_received, wan_packets_sent, wan_packets_received, lan_bytes_sent, lan_bytes_received, lan_packets_sent, lan_packets_received, wifi_bytes_sent, wifi_bytes_received, wifi_packets_sent, wifi_packets_received, signal_pon, wifi2_4_channel, wifi2_4bandwith, wifi2_4ssid, wifi_5_channel, wifi_5_bandwith, wifi_5_ssid, uptime)
+                elif prefix == 'dados;':
+                    _, time, device_id, wan_bytes_sent, wan_bytes_received, wan_packets_sent, wan_packets_received, lan_bytes_sent, lan_bytes_received, lan_packets_sent, lan_packets_received, wifi_bytes_sent, wifi_bytes_received, wifi_packets_sent, wifi_packets_received, signal_pon, wifi2_4_channel, wifi2_4bandwith, wifi2_4ssid, wifi_5_channel, wifi_5_bandwith, wifi_5_ssid, uptime, memory_free, memory_total, cpu_usage = key.split(";")
+                    insert_dados(connection_bulkdata, time, device_id, wan_bytes_sent, wan_bytes_received, wan_packets_sent, wan_packets_received, lan_bytes_sent, lan_bytes_received, lan_packets_sent, lan_packets_received, wifi_bytes_sent, wifi_bytes_received, wifi_packets_sent, wifi_packets_received, signal_pon, wifi2_4_channel, wifi2_4bandwith, wifi2_4ssid, wifi_5_channel, wifi_5_bandwith, wifi_5_ssid, uptime, memory_free, memory_total, cpu_usage)
                 elif prefix == 'routers;':
                     _, device_id, latitude, longitude, ssid, mac_address = key.split(";")
                     insert_routers(connection_bulkdata, device_id, latitude, longitude, ssid, mac_address)
 
                 processed_keys.add(key)  # Marcar a chave como processada
             except ValueError as e:
-                print(f"Erro ao processar a chave {key}: {e}")
+                logging.info(f"Erro ao processar a chave {key}: {e}")
             except Exception as e:
-                print(f"Erro inesperado ao processar a chave {key}: {e}")
+                logging.error(f"Erro inesperado ao processar a chave {key}: {e}")
 
-# Função principal
+# Função principal com lógica de reconexão
 def main():
-    try:
-        connection_geo, connection_bulkdata = connect_to_timescale()
-        processed_keys = set()  # Rastrear chaves já processadas
-        
-        while True:
-            process_redis_keys(connection_geo, connection_bulkdata, processed_keys)
-            time.sleep(5)  # Aguardar 5 segundos antes de verificar novamente
-    except KeyboardInterrupt:
-        print("Encerrando o programa.")
-    except Exception as e:
-        print(f"Erro no programa principal: {e}")
-    finally:
-        if 'connection_geo' in locals() and connection_geo:
-            connection_geo.close()
-        if 'connection_bulkdata' in locals() and connection_bulkdata:
-            connection_bulkdata.close()
+    processed_keys = set()
+    connection_geo = None
+    connection_bulkdata = None
+
+    while True:  # Loop externo para reconexão
+        try:
+            # Conectar ao TimescaleDB
+            connection_geo, connection_bulkdata = connect_to_timescale()
+
+            # Loop interno para processamento contínuo
+            while True:
+                # Verifica se as conexões estão ativas
+                if connection_geo.closed or connection_bulkdata.closed:
+                    logging.error("Conexões perdidas. Reconectando...")
+                    break  # Sai do loop interno para reconectar
+
+                # Processa as chaves do Redis
+                process_redis_keys(connection_geo, connection_bulkdata, processed_keys)
+                time.sleep(5)
+
+        except OperationalError as e:
+            logging.error(f"Erro de conexão: {e}. Tentando reconectar em 5 segundos...")
+            time.sleep(5)
+        except KeyboardInterrupt:
+            logging.info("Encerrando o programa.")
+            break
+        except Exception as e:
+            logging.error(f"Erro inesperado: {e}. Tentando reconectar em 5 segundos...")
+            time.sleep(5)
+        finally:
+            # Fecha as conexões ao sair ou em caso de erro
+            if connection_geo and not connection_geo.closed:
+                connection_geo.close()
+            if connection_bulkdata and not connection_bulkdata.closed:
+                connection_bulkdata.close()
 
 if __name__ == "__main__":
     main()
+
